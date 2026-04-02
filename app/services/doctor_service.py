@@ -16,7 +16,7 @@ def _get_patient_or_404(db: Session, patient_id: int) -> Patient:
         select(Patient)
         .options(
             joinedload(Patient.user),
-            joinedload(Patient.chats),
+            joinedload(Patient.chats).joinedload(Chat.doctor_notes),
             joinedload(Patient.medical_histories),
             joinedload(Patient.doctor_notes),
         )
