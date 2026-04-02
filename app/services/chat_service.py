@@ -7,7 +7,7 @@ from app.models.enums import SeverityLevel
 from app.models.medical_history import MedicalHistory
 from app.models.patient import Patient
 from app.schemas.chat import ChatRequest
-from app.services.ollama_service import generate_with_ollama
+from app.services.openai_service import generate_with_openai
 from app.services.risk_service import RiskAssessment, assess_risk
 
 
@@ -132,7 +132,7 @@ def process_patient_chat(db: Session, patient: Patient, payload: ChatRequest) ->
     )
 
     prompt = _build_prompt(patient, payload, risk, previous_chats, medical_history, doctor_notes)
-    model_response = generate_with_ollama(prompt)
+    model_response = generate_with_openai(prompt)
     safe_response = _append_safety_footer(model_response, risk)
 
     chat = Chat(
