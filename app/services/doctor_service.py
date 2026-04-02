@@ -9,6 +9,7 @@ from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.doctor import DoctorNoteCreate, FlaggedConversationResponse
 from app.schemas.patient import MedicalHistoryCreate
+from app.services.audit_service import log_action
 
 
 def _get_patient_or_404(db: Session, patient_id: int) -> Patient:
@@ -79,6 +80,8 @@ def add_doctor_note(db: Session, current_doctor: User, payload: DoctorNoteCreate
         message_to_patient=payload.message_to_patient,
     )
     db.add(note)
+    log_action(db, "add_doctor_note", user_id=current_doctor.id, resource="doctor_note",
+               resource_id=None, detail=f"chat_id={chat.id} patient_id={chat.patient_id}")
     db.commit()
     db.refresh(note)
     return note
@@ -91,6 +94,7 @@ def mark_chat_reviewed(db: Session, chat_id: int) -> Chat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
     chat.is_reviewed = True
     chat.reviewed_at = datetime.now(timezone.utc)
+    log_action(db, "mark_reviewed", resource="chat", resource_id=chat_id)
     db.commit()
     db.refresh(chat)
     return chat

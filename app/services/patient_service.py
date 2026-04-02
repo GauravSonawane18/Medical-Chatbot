@@ -23,6 +23,22 @@ def get_patient_summary(db: Session, patient_id: int) -> Patient:
     return patient
 
 
+def search_chat_history(db: Session, patient_id: int, query: str, limit: int = 50) -> list[Chat]:
+    from sqlalchemy import or_
+    term = f"%{query}%"
+    statement = (
+        select(Chat)
+        .options(joinedload(Chat.doctor_notes))
+        .where(
+            Chat.patient_id == patient_id,
+            or_(Chat.message.ilike(term), Chat.response.ilike(term), Chat.symptoms.ilike(term)),
+        )
+        .order_by(Chat.created_at.desc())
+        .limit(limit)
+    )
+    return list(db.scalars(statement).unique().all())
+
+
 def list_chat_history(db: Session, patient_id: int, limit: int = 50) -> list[Chat]:
     statement = (
         select(Chat)

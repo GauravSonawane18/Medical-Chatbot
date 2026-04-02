@@ -7,8 +7,10 @@ from app.models.enums import SeverityLevel
 from app.models.medical_history import MedicalHistory
 from app.models.patient import Patient
 from app.schemas.chat import ChatRequest
+from app.services.audit_service import log_action
 from app.services.openai_service import generate_with_openai
 from app.services.risk_service import RiskAssessment, assess_risk
+from app.services.summary_service import get_latest_summary, maybe_summarise
 
 
 DISCLAIMER = (
@@ -31,14 +33,18 @@ def _build_prompt(
     previous_chats: list[Chat],
     medical_history: list[MedicalHistory],
     doctor_notes: list[DoctorNote],
+    chat_summary: str | None = None,
 ) -> str:
-    chat_context = _format_history(
-        [
-            f"- Patient: {chat.message}\n  Assistant: {chat.response[:180]}"
-            for chat in previous_chats
-        ],
-        "No prior chat history available.",
-    )
+    if chat_summary:
+        chat_context = f"[AI-generated summary of prior conversations]\n{chat_summary}"
+    else:
+        chat_context = _format_history(
+            [
+                f"- Patient: {chat.message}\n  Assistant: {chat.response[:180]}"
+                for chat in previous_chats
+            ],
+            "No prior chat history available.",
+        )
     medical_context = _format_history(
         [
             f"- Condition: {entry.condition}; Notes: {(entry.notes or 'No notes')[:140]}"
@@ -131,7 +137,14 @@ def process_patient_chat(db: Session, patient: Patient, payload: ChatRequest) ->
         ).all()
     )
 
-    prompt = _build_prompt(patient, payload, risk, previous_chats, medical_history, doctor_notes)
+    # Use AI-generated summary when available, replacing raw recent chats
+    chat_summary = get_latest_summary(db, patient.id)
+    if chat_summary:
+        previous_chats_override = []  # summary replaces individual chats in prompt
+    else:
+        previous_chats_override = previous_chats
+
+    prompt = _build_prompt(patient, payload, risk, previous_chats_override, medical_history, doctor_notes, chat_summary)
     model_response = generate_with_openai(prompt)
     safe_response = _append_safety_footer(model_response, risk)
 
@@ -143,6 +156,7 @@ def process_patient_chat(db: Session, patient: Patient, payload: ChatRequest) ->
         severity_level=risk.severity,
         is_flagged=risk.is_flagged,
         risk_reason=risk.reason,
+        attachment_url=payload.attachment_url,
     )
     db.add(chat)
     db.flush()
@@ -158,7 +172,11 @@ def process_patient_chat(db: Session, patient: Patient, payload: ChatRequest) ->
             notes=notes,
         ))
 
+    log_action(db, "chat", user_id=patient.user_id, resource="chat", resource_id=chat.id,
+               detail=f"severity={risk.severity.value} flagged={risk.is_flagged}")
     db.commit()
     db.refresh(chat)
+    # Auto-summarise if threshold reached (runs after commit so new chat is visible)
+    maybe_summarise(db, patient)
     return chat
 

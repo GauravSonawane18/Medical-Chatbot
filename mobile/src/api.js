@@ -61,13 +61,30 @@ export const api = {
   healthCheck: () => request('/health', { skipAuth: true }),
   login: (body) => request('/login', { method: 'POST', body, skipAuth: true }),
   register: (body) => request('/register', { method: 'POST', body, skipAuth: true }),
+  requestPasswordReset: (body) => request('/password-reset/request', { method: 'POST', body, skipAuth: true }),
+  confirmPasswordReset: (body) => request('/password-reset/confirm', { method: 'POST', body, skipAuth: true }),
 
   getMe: () => request('/me'),
   getChatHistory: () => request('/chat/history'),
+  searchChats: (q) => request(`/chat/search?q=${encodeURIComponent(q)}`),
   getMedicalHistory: () => request('/medical-history'),
   sendChat: (body) => request('/chat', { method: 'POST', body }),
 
   replyToNote: (noteId, body) => request(`/notes/${noteId}/reply`, { method: 'POST', body }),
+  registerPushToken: (body) => request('/push-token', { method: 'POST', body }),
+  uploadFile: async (uri, filename, mimeType) => {
+    const token = await import('./storage').then(m => m.getToken());
+    const formData = new FormData();
+    formData.append('file', { uri, name: filename, type: mimeType });
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!response.ok) throw new Error('Upload failed.');
+    return response.json();
+  },
+  registerDoctorPushToken: (body) => request('/doctor/push-token', { method: 'POST', body }),
 
   getPatients: () => request('/patients'),
   getPatient: (id) => request(`/patients/${id}`),

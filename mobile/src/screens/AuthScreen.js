@@ -14,7 +14,7 @@ import {
 import Alert from '../components/Alert';
 import { api } from '../api';
 import { saveSession } from '../storage';
-import { colors, shared } from '../theme';
+import { useTheme } from '../ThemeContext';
 
 const GENDERS = ['Male', 'Female', 'Other'];
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -62,27 +62,28 @@ const registerDefaults = {
 };
 
 function Dropdown({ label, options, value, onSelect }) {
+  const { colors, shared } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <>
       <Text style={shared.label}>{label}</Text>
-      <TouchableOpacity style={styles.dropdownBtn} onPress={() => setOpen(true)}>
-        <Text style={value ? styles.dropdownValue : styles.dropdownPlaceholder}>
+      <TouchableOpacity style={[styles.dropdownBtn, { borderColor: colors.border, backgroundColor: colors.inputBg }]} onPress={() => setOpen(true)}>
+        <Text style={value ? [styles.dropdownValue, { color: colors.text }] : styles.dropdownPlaceholder}>
           {value || `Select ${label}`}
         </Text>
-        <Text style={styles.dropdownArrow}>▾</Text>
+        <Text style={[styles.dropdownArrow, { color: colors.muted }]}>▾</Text>
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setOpen(false)} activeOpacity={1}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>{label}</Text>
+          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{label}</Text>
             {options.map((opt) => (
               <TouchableOpacity
                 key={opt}
-                style={[styles.modalOption, value === opt && styles.modalOptionActive]}
+                style={[styles.modalOption, value === opt && { backgroundColor: colors.primary }]}
                 onPress={() => { onSelect(opt); setOpen(false); }}
               >
-                <Text style={[styles.modalOptionText, value === opt && styles.modalOptionTextActive]}>{opt}</Text>
+                <Text style={[styles.modalOptionText, { color: value === opt ? '#fff' : colors.text }]}>{opt}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -93,6 +94,7 @@ function Dropdown({ label, options, value, onSelect }) {
 }
 
 function CountryCodePicker({ value, onSelect }) {
+  const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -110,24 +112,25 @@ function CountryCodePicker({ value, onSelect }) {
 
   return (
     <>
-      <TouchableOpacity style={styles.countryPickerBtn} onPress={() => setOpen(true)}>
-        <Text style={styles.countryPickerText}>+{value}</Text>
-        <Text style={styles.dropdownArrow}>▾</Text>
+      <TouchableOpacity style={[styles.countryPickerBtn, { borderColor: colors.border, backgroundColor: colors.inputBg }]} onPress={() => setOpen(true)}>
+        <Text style={[styles.countryPickerText, { color: colors.text }]}>+{value}</Text>
+        <Text style={[styles.dropdownArrow, { color: colors.muted }]}>▾</Text>
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="slide">
-        <View style={styles.countryModal}>
-          <View style={styles.countryModalHeader}>
-            <Text style={styles.countryModalTitle}>Select Country Code</Text>
+        <View style={[styles.countryModal, { backgroundColor: colors.card }]}>
+          <View style={[styles.countryModalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.countryModalTitle, { color: colors.text }]}>Select Country Code</Text>
             <TouchableOpacity onPress={() => { setOpen(false); setSearch(''); }}>
-              <Text style={styles.countryModalClose}>✕</Text>
+              <Text style={[styles.countryModalClose, { color: colors.muted }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <TextInput
-            style={styles.countrySearch}
+            style={[styles.countrySearch, { borderColor: colors.border, color: colors.text, backgroundColor: colors.inputBg }]}
             value={search}
             onChangeText={setSearch}
             placeholder="Search country or code…"
+            placeholderTextColor={colors.muted}
             autoFocus
           />
           <FlatList
@@ -135,11 +138,11 @@ function CountryCodePicker({ value, onSelect }) {
             keyExtractor={(item, i) => `${item.code}-${i}`}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.countryItem, item.code === value && styles.countryItemActive]}
+                style={[styles.countryItem, { borderBottomColor: colors.border }, item.code === value && { backgroundColor: colors.primary }]}
                 onPress={() => { onSelect(item.code); setOpen(false); setSearch(''); }}
               >
-                <Text style={styles.countryItemName}>{item.name}</Text>
-                <Text style={[styles.countryItemCode, item.code === value && { color: '#fff' }]}>+{item.code}</Text>
+                <Text style={[styles.countryItemName, { color: item.code === value ? '#fff' : colors.text }]}>{item.name}</Text>
+                <Text style={[styles.countryItemCode, { color: item.code === value ? '#fff' : colors.muted }]}>+{item.code}</Text>
               </TouchableOpacity>
             )}
           />
@@ -150,6 +153,7 @@ function CountryCodePicker({ value, onSelect }) {
 }
 
 export default function AuthScreen({ onLogin }) {
+  const { colors, shared, dark, toggle: toggleTheme } = useTheme();
   const [tab, setTab] = useState('login');
   const [loginForm, setLoginForm] = useState(loginDefaults);
   const [registerForm, setRegisterForm] = useState(registerDefaults);
@@ -157,6 +161,12 @@ export default function AuthScreen({ onLogin }) {
   const [phoneError, setPhoneError] = useState('');
   const [alert, setAlert] = useState({ message: '', type: 'error' });
   const [busy, setBusy] = useState(false);
+  // Password reset flow
+  const [resetStep, setResetStep] = useState(null); // null | 'request' | 'confirm'
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
 
   function setLogin(key, val) { setLoginForm((f) => ({ ...f, [key]: val })); }
   function setReg(key, val) { setRegisterForm((f) => ({ ...f, [key]: val })); }
@@ -192,6 +202,39 @@ export default function AuthScreen({ onLogin }) {
       setAlert({ message: e.message, type: 'error' });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleResetRequest() {
+    if (!resetEmail.trim()) return;
+    setResetBusy(true);
+    setAlert({ message: '' });
+    try {
+      const data = await api.requestPasswordReset({ email: resetEmail });
+      // In prod, token is emailed. Here we pre-fill it for demo.
+      setResetToken(data.reset_token || '');
+      setResetStep('confirm');
+      setAlert({ message: data.message, type: 'success' });
+    } catch (e) {
+      setAlert({ message: e.message, type: 'error' });
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  async function handleResetConfirm() {
+    if (!resetToken.trim() || !newPassword.trim()) return;
+    setResetBusy(true);
+    setAlert({ message: '' });
+    try {
+      const data = await api.confirmPasswordReset({ token: resetToken, new_password: newPassword });
+      setAlert({ message: data.message, type: 'success' });
+      setResetStep(null);
+      setResetEmail(''); setResetToken(''); setNewPassword('');
+    } catch (e) {
+      setAlert({ message: e.message, type: 'error' });
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -239,34 +282,66 @@ export default function AuthScreen({ onLogin }) {
   }
 
   return (
-    <KeyboardAvoidingView style={shared.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[shared.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.logo}>MedAssist</Text>
-          <Text style={styles.tagline}>AI-powered symptom guidance, reviewed by doctors.</Text>
+          <TouchableOpacity style={styles.themePill} onPress={toggleTheme}>
+            <Text style={styles.themePillText}>{dark ? '☀️ Light' : '🌙 Dark'}</Text>
+          </TouchableOpacity>
+          <Text style={[styles.logo, { color: colors.primary }]}>MedAssist</Text>
+          <Text style={[styles.tagline, { color: colors.muted }]}>AI-powered symptom guidance, reviewed by doctors.</Text>
         </View>
 
-        <View style={styles.tabRow}>
+        <View style={[styles.tabRow, { backgroundColor: colors.border }]}>
           {['login', 'register'].map((t) => (
-            <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
-              <Text style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}>
+            <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && { backgroundColor: colors.card }]} onPress={() => setTab(t)}>
+              <Text style={[styles.tabBtnText, { color: tab === t ? colors.primary : colors.muted }]}>
                 {t === 'login' ? 'Sign In' : 'Register'}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <View style={shared.card}>
+        <View style={[shared.card, { backgroundColor: colors.card }]}>
           <Alert message={alert.message} type={alert.type} />
 
-          {tab === 'login' ? (
+          {tab === 'login' && resetStep === null ? (
             <>
               <Text style={shared.label}>Email</Text>
-              <TextInput style={shared.input} value={loginForm.email} onChangeText={(v) => setLogin('email', v)} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
+              <TextInput style={shared.input} value={loginForm.email} onChangeText={(v) => setLogin('email', v)} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={colors.muted} />
               <Text style={shared.label}>Password</Text>
-              <TextInput style={shared.input} value={loginForm.password} onChangeText={(v) => setLogin('password', v)} secureTextEntry placeholder="••••••••" />
+              <TextInput style={shared.input} value={loginForm.password} onChangeText={(v) => setLogin('password', v)} secureTextEntry placeholder="••••••••" placeholderTextColor={colors.muted} />
               <TouchableOpacity style={[shared.primaryBtn, busy && { opacity: 0.6 }]} onPress={handleLogin} disabled={busy}>
                 <Text style={shared.primaryBtnText}>{busy ? 'Signing in…' : 'Sign In'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => { setResetStep('request'); setAlert({ message: '' }); }}>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Forgot password?</Text>
+              </TouchableOpacity>
+            </>
+          ) : tab === 'login' && resetStep === 'request' ? (
+            <>
+              <Text style={[styles.sectionLabel, { color: colors.primary }]}>Reset Password</Text>
+              <Text style={shared.label}>Your email address</Text>
+              <TextInput style={shared.input} value={resetEmail} onChangeText={setResetEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={colors.muted} />
+              <TouchableOpacity style={[shared.primaryBtn, resetBusy && { opacity: 0.6 }]} onPress={handleResetRequest} disabled={resetBusy}>
+                <Text style={shared.primaryBtnText}>{resetBusy ? 'Sending…' : 'Send Reset Token'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => { setResetStep(null); setAlert({ message: '' }); }}>
+                <Text style={{ color: colors.muted, fontSize: 13 }}>← Back to Sign In</Text>
+              </TouchableOpacity>
+            </>
+          ) : tab === 'login' && resetStep === 'confirm' ? (
+            <>
+              <Text style={[styles.sectionLabel, { color: colors.primary }]}>Set New Password</Text>
+              <Text style={shared.label}>Reset Token</Text>
+              <TextInput style={shared.input} value={resetToken} onChangeText={setResetToken} placeholder="Paste token here" placeholderTextColor={colors.muted} autoCapitalize="none" />
+              <Text style={shared.label}>New Password</Text>
+              <TextInput style={shared.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="Min. 8 characters" placeholderTextColor={colors.muted} />
+              <TouchableOpacity style={[shared.primaryBtn, resetBusy && { opacity: 0.6 }]} onPress={handleResetConfirm} disabled={resetBusy}>
+                <Text style={shared.primaryBtnText}>{resetBusy ? 'Resetting…' : 'Reset Password'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => { setResetStep('request'); setAlert({ message: '' }); }}>
+                <Text style={{ color: colors.muted, fontSize: 13 }}>← Back</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -284,8 +359,8 @@ export default function AuthScreen({ onLogin }) {
               <Text style={shared.label}>Role</Text>
               <View style={styles.roleRow}>
                 {['patient', 'doctor'].map((r) => (
-                  <TouchableOpacity key={r} style={[styles.roleBtn, registerForm.role === r && styles.roleBtnActive]} onPress={() => setReg('role', r)}>
-                    <Text style={[styles.roleBtnText, registerForm.role === r && styles.roleBtnTextActive]}>
+                  <TouchableOpacity key={r} style={[styles.roleBtn, { borderColor: registerForm.role === r ? colors.primary : colors.border, backgroundColor: registerForm.role === r ? colors.primary : colors.card }]} onPress={() => setReg('role', r)}>
+                    <Text style={[styles.roleBtnText, { color: registerForm.role === r ? '#fff' : colors.muted }]}>
                       {r.charAt(0).toUpperCase() + r.slice(1)}
                     </Text>
                   </TouchableOpacity>
@@ -300,7 +375,7 @@ export default function AuthScreen({ onLogin }) {
 
               {registerForm.role === 'patient' && (
                 <>
-                  <Text style={styles.sectionLabel}>Patient Details</Text>
+                  <Text style={[styles.sectionLabel, { color: colors.primary }]}>Patient Details</Text>
 
                   <Text style={shared.label}>Age</Text>
                   <TextInput style={shared.input} value={registerForm.age} onChangeText={(v) => setReg('age', v)} keyboardType="numeric" placeholder="25" />
@@ -312,11 +387,12 @@ export default function AuthScreen({ onLogin }) {
                   <View style={styles.phoneRow}>
                     <CountryCodePicker value={registerForm.countryCode} onSelect={(v) => setReg('countryCode', v)} />
                     <TextInput
-                      style={[styles.phoneInput, phoneError ? styles.inputError : null]}
+                      style={[styles.phoneInput, { borderColor: phoneError ? '#dc2626' : colors.border, color: colors.text, backgroundColor: colors.inputBg }]}
                       value={registerForm.phoneNumber}
                       onChangeText={handlePhoneChange}
                       keyboardType="numeric"
                       placeholder="10-digit number"
+                      placeholderTextColor={colors.muted}
                       maxLength={10}
                     />
                   </View>
@@ -336,8 +412,8 @@ export default function AuthScreen({ onLogin }) {
                     />
                     <View style={styles.unitRow}>
                       {WEIGHT_UNITS.map((u) => (
-                        <TouchableOpacity key={u} style={[styles.unitBtn, registerForm.weight_unit === u && styles.unitBtnActive]} onPress={() => setReg('weight_unit', u)}>
-                          <Text style={[styles.unitBtnText, registerForm.weight_unit === u && styles.unitBtnTextActive]}>{u}</Text>
+                        <TouchableOpacity key={u} style={[styles.unitBtn, { borderColor: registerForm.weight_unit === u ? colors.primary : colors.border, backgroundColor: registerForm.weight_unit === u ? colors.primary : colors.card }]} onPress={() => setReg('weight_unit', u)}>
+                          <Text style={[{ fontWeight: '600', color: registerForm.weight_unit === u ? '#fff' : colors.muted }]}>{u}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -352,7 +428,7 @@ export default function AuthScreen({ onLogin }) {
           )}
         </View>
 
-        <Text style={styles.disclaimer}>
+        <Text style={[styles.disclaimer, { color: colors.muted }]}>
           Responses are informational only and do not replace licensed medical advice.
         </Text>
       </ScrollView>
@@ -363,50 +439,43 @@ export default function AuthScreen({ onLogin }) {
 const styles = StyleSheet.create({
   container: { padding: 20, paddingTop: 60 },
   header: { alignItems: 'center', marginBottom: 28 },
-  logo: { fontSize: 32, fontWeight: '800', color: colors.primary },
-  tagline: { fontSize: 14, color: colors.muted, marginTop: 6, textAlign: 'center' },
-  tabRow: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 10, padding: 4, marginBottom: 16 },
+  themePill: { alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 20, marginBottom: 12 },
+  themePillText: { fontSize: 13, fontWeight: '600' },
+  logo: { fontSize: 32, fontWeight: '800' },
+  tagline: { fontSize: 14, marginTop: 6, textAlign: 'center' },
+  tabRow: { flexDirection: 'row', borderRadius: 10, padding: 4, marginBottom: 16 },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  tabBtnActive: { backgroundColor: colors.card },
-  tabBtnText: { fontSize: 14, color: colors.muted, fontWeight: '600' },
-  tabBtnTextActive: { color: colors.primary },
+  tabBtnText: { fontSize: 14, fontWeight: '600' },
   roleRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  roleBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  roleBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  roleBtnText: { color: colors.muted, fontWeight: '600' },
-  roleBtnTextActive: { color: '#fff' },
-  sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 10, marginTop: 8 },
-  dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff', marginBottom: 12 },
-  dropdownValue: { fontSize: 15, color: colors.text },
+  roleBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  roleBtnText: { fontWeight: '600' },
+  sectionLabel: { fontSize: 13, fontWeight: '700', marginBottom: 10, marginTop: 8 },
+  dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, marginBottom: 12 },
+  dropdownValue: { fontSize: 15 },
   dropdownPlaceholder: { fontSize: 15, color: '#aaa' },
-  dropdownArrow: { fontSize: 14, color: colors.muted },
+  dropdownArrow: { fontSize: 14 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 32 },
-  modalBox: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  modalTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 },
+  modalBox: { borderRadius: 12, padding: 16 },
+  modalTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
   modalOption: { paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8 },
-  modalOptionActive: { backgroundColor: colors.primary },
-  modalOptionText: { fontSize: 15, color: colors.text },
-  modalOptionTextActive: { color: '#fff', fontWeight: '600' },
+  modalOptionText: { fontSize: 15 },
   phoneRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
-  countryPickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff', minWidth: 80 },
-  countryPickerText: { fontSize: 15, color: colors.text, marginRight: 4 },
-  phoneInput: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text, backgroundColor: '#fff' },
-  countryModal: { flex: 1, backgroundColor: '#fff', marginTop: 60, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  countryModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-  countryModalTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  countryModalClose: { fontSize: 18, color: colors.muted },
-  countrySearch: { margin: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  countryItem: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
-  countryItemActive: { backgroundColor: colors.primary },
-  countryItemName: { fontSize: 15, color: colors.text },
-  countryItemCode: { fontSize: 15, color: colors.muted, fontWeight: '600' },
-  inputError: { borderColor: colors.danger },
-  fieldError: { fontSize: 12, color: colors.danger, marginTop: -8, marginBottom: 10 },
+  countryPickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, minWidth: 80 },
+  countryPickerText: { fontSize: 15, marginRight: 4 },
+  phoneInput: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+  countryModal: { flex: 1, marginTop: 60, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  countryModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+  countryModalTitle: { fontSize: 16, fontWeight: '700' },
+  countryModalClose: { fontSize: 18 },
+  countrySearch: { margin: 12, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+  countryItem: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  countryItemName: { fontSize: 15 },
+  countryItemCode: { fontSize: 15, fontWeight: '600' },
+  inputError: { borderColor: '#dc2626' },
+  fieldError: { fontSize: 12, color: '#dc2626', marginTop: -8, marginBottom: 10 },
   weightRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   unitRow: { flexDirection: 'row', gap: 8 },
-  unitBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  unitBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  unitBtnText: { color: colors.muted, fontWeight: '600' },
+  unitBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
   unitBtnTextActive: { color: '#fff' },
-  disclaimer: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 16, marginBottom: 32 },
+  disclaimer: { fontSize: 12, textAlign: 'center', marginTop: 16, marginBottom: 32 },
 });

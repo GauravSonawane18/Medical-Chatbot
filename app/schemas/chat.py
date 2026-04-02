@@ -8,6 +8,7 @@ from app.models.enums import SeverityLevel
 class ChatRequest(BaseModel):
     message: str = Field(min_length=2, max_length=3000)
     symptoms: str | None = Field(default=None, max_length=1000)
+    attachment_url: str | None = Field(default=None, max_length=500)
 
 
 class ChatDoctorNote(BaseModel):
@@ -36,6 +37,7 @@ class ChatHistoryItem(BaseModel):
     is_reviewed: bool
     reviewed_at: datetime | None
     risk_reason: str | None
+    attachment_url: str | None = None
     created_at: datetime
     doctor_notes: list[ChatDoctorNote] = []
 
@@ -47,4 +49,5 @@ class ChatResponse(BaseModel):
     is_flagged: bool
     is_reviewed: bool = False
     risk_reason: str | None
+    attachment_url: str | None = None
     created_at: datetime

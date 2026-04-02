@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
@@ -11,11 +12,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import Alert from '../components/Alert';
 import TabBar from '../components/TabBar';
-import { api } from '../api';
+import { api, API_BASE_URL } from '../api';
 import { useWebSocket } from '../useWebSocket';
-import { colors, shared } from '../theme';
+import { useTheme } from '../ThemeContext';
+import { usePushNotifications } from '../usePushNotifications';
 
 const TABS = [
   { key: 'chat', label: 'Chat' },
@@ -50,6 +53,7 @@ function SeverityBadge({ level, flagged }) {
 }
 
 function DoctorNoteCard({ note, onReload }) {
+  const { colors } = useTheme();
   const [replyText, setReplyText] = useState('');
   const [showReply, setShowReply] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -72,7 +76,7 @@ function DoctorNoteCard({ note, onReload }) {
   }
 
   return (
-    <View style={styles.doctorNoteCard}>
+    <View style={[styles.doctorNoteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.doctorNoteHeader}>
         <Text style={styles.doctorNoteIcon}>🩺</Text>
         <Text style={styles.doctorNoteTitle}>Doctor's Response</Text>
@@ -157,11 +161,12 @@ function DoctorNoteCard({ note, onReload }) {
 }
 
 function ChatCard({ item, onReload }) {
+  const { colors } = useTheme();
   const sc = SEVERITY_CONFIG[item.severity_level] || SEVERITY_CONFIG.low;
   const hasDoctorNotes = item.doctor_notes?.length > 0;
 
   return (
-    <View style={[styles.chatCard, { borderLeftColor: sc.text }]}>
+    <View style={[styles.chatCard, { borderLeftColor: sc.text, backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Header row */}
       <View style={styles.chatCardHeader}>
         <SeverityBadge level={item.severity_level} flagged={item.is_flagged} />
@@ -176,17 +181,24 @@ function ChatCard({ item, onReload }) {
       )}
 
       {/* Patient message */}
-      <View style={styles.patientMsgBox}>
-        <Text style={styles.patientMsgLabel}>You asked</Text>
+      <View style={[styles.patientMsgBox, { backgroundColor: colors.bg }]}>
+        <Text style={[styles.patientMsgLabel, { color: colors.muted }]}>You asked</Text>
         <Text style={styles.patientMsgText}>{item.message}</Text>
         {item.symptoms ? (
           <Text style={styles.symptomsText}>Symptoms: {item.symptoms}</Text>
         ) : null}
+        {item.attachment_url ? (
+          <Image
+            source={{ uri: `${API_BASE_URL}${item.attachment_url}` }}
+            style={styles.attachmentImg}
+            resizeMode="cover"
+          />
+        ) : null}
       </View>
 
       {/* AI response */}
-      <View style={styles.aiMsgBox}>
-        <Text style={styles.aiMsgLabel}>AI Assistant</Text>
+      <View style={[styles.aiMsgBox, { backgroundColor: colors.dark ? '#1e3a5f' : '#eff6ff' }]}>
+        <Text style={[styles.aiMsgLabel, { color: colors.primary }]}>AI Assistant</Text>
         {item.response === null
           ? <View style={styles.typingRow}>
               <ActivityIndicator size="small" color={colors.primary} />
@@ -215,6 +227,8 @@ function ChatCard({ item, onReload }) {
 }
 
 export default function PatientScreen({ user, onLogout }) {
+  const { colors, shared, dark, toggle: toggleTheme } = useTheme();
+  usePushNotifications(false);
   const [tab, setTab] = useState('chat');
   const [profile, setProfile] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
@@ -223,8 +237,31 @@ export default function PatientScreen({ user, onLogout }) {
   const [refreshing, setRefreshing] = useState(false);
   const [symptoms, setSymptoms] = useState('');
   const [message, setMessage] = useState('');
+  const [severity, setSeverity] = useState('Mild');
+  const [duration, setDuration] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null); // null = not searching
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [attachmentUri, setAttachmentUri] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef(null);
+
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setAlert({ message: 'Photo library access is required to attach images.', type: 'error' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets?.length > 0) {
+      setAttachmentUri(result.assets[0].uri);
+    }
+  }
 
   // Real-time: doctor sends a note/message → update that chat immediately
   useWebSocket((event) => {
@@ -272,13 +309,21 @@ export default function PatientScreen({ user, onLogout }) {
     if (!message.trim()) return;
     const userMsg = message.trim();
     const userSymptoms = symptoms.trim();
+    const localAttachmentUri = attachmentUri;
+
+    // Build enriched message with symptom checker context
+    const enrichedMsg = [
+      userMsg,
+      severity !== 'Mild' ? `Severity: ${severity}` : '',
+      duration ? `Duration: ${duration}` : '',
+    ].filter(Boolean).join(' | ');
 
     // Optimistic: show message immediately as a pending card
     const tempId = `pending-${Date.now()}`;
     setChatHistory((prev) => [
       {
         id: tempId,
-        message: userMsg,
+        message: enrichedMsg,
         symptoms: userSymptoms || null,
         response: null, // null = still loading
         severity_level: 'low',
@@ -286,6 +331,7 @@ export default function PatientScreen({ user, onLogout }) {
         is_reviewed: false,
         reviewed_at: null,
         risk_reason: null,
+        attachment_url: localAttachmentUri ? 'pending' : null,
         doctor_notes: [],
         created_at: new Date().toISOString(),
       },
@@ -293,11 +339,24 @@ export default function PatientScreen({ user, onLogout }) {
     ]);
     setMessage('');
     setSymptoms('');
+    setAttachmentUri(null);
     setChatBusy(true);
     setAlert({ message: '' });
 
     try {
-      await api.sendChat({ message: userMsg, symptoms: userSymptoms || null });
+      let attachmentUrl = null;
+      if (localAttachmentUri) {
+        setUploading(true);
+        const filename = localAttachmentUri.split('/').pop() || 'photo.jpg';
+        const ext = filename.split('.').pop().toLowerCase();
+        const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+        const uploaded = await api.uploadFile(localAttachmentUri, filename, mimeType);
+        attachmentUrl = uploaded.url;
+        setUploading(false);
+      }
+      await api.sendChat({ message: enrichedMsg, symptoms: userSymptoms || null, attachment_url: attachmentUrl });
+      setSeverity('Mild');
+      setDuration('');
       await loadData();
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     } catch (e) {
@@ -305,9 +364,11 @@ export default function PatientScreen({ user, onLogout }) {
       setChatHistory((prev) => prev.filter((c) => c.id !== tempId));
       setMessage(userMsg);
       setSymptoms(userSymptoms);
+      setAttachmentUri(localAttachmentUri);
       setAlert({ message: e.message, type: 'error' });
     } finally {
       setChatBusy(false);
+      setUploading(false);
     }
   }
 
@@ -317,18 +378,21 @@ export default function PatientScreen({ user, onLogout }) {
   }, 0);
 
   return (
-    <View style={shared.screen}>
+    <View style={[shared.screen, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { backgroundColor: colors.headerBg }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.topGreeting}>Hello,</Text>
           <Text style={styles.topName}>{user.name}</Text>
         </View>
         {unreadDoctorMessages > 0 && (
           <View style={styles.notifBadge}>
-            <Text style={styles.notifText}>💬 {unreadDoctorMessages} doctor message{unreadDoctorMessages > 1 ? 's' : ''}</Text>
+            <Text style={styles.notifText}>💬 {unreadDoctorMessages}</Text>
           </View>
         )}
+        <TouchableOpacity style={styles.themeBtn} onPress={toggleTheme}>
+          <Text style={styles.themeBtnText}>{dark ? '☀️' : '🌙'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
@@ -350,51 +414,161 @@ export default function PatientScreen({ user, onLogout }) {
           {/* ── Chat Tab ── */}
           {tab === 'chat' && (
             <>
-              {/* Input card */}
-              <View style={styles.inputCard}>
-                <Text style={styles.inputCardTitle}>Ask the AI Assistant</Text>
-                <Text style={shared.label}>Symptoms <Text style={styles.optionalTag}>(optional)</Text></Text>
+              {/* Symptom Checker / Input card */}
+              <View style={[styles.inputCard, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.inputCardTitle, { color: colors.text }]}>Symptom Checker</Text>
+
+                <Text style={[shared.label, { color: colors.label }]}>What is your main symptom?</Text>
                 <TextInput
-                  style={shared.input}
-                  value={symptoms}
-                  onChangeText={setSymptoms}
-                  placeholder="fever, cough, chest pain…"
-                  placeholderTextColor={colors.muted}
-                />
-                <Text style={shared.label}>Describe what you're feeling</Text>
-                <TextInput
-                  style={[shared.textarea, { height: 100 }]}
+                  style={[shared.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="I've had a headache for 3 days and feel dizzy…"
+                  placeholder="e.g. chest pain, headache, fever…"
                   placeholderTextColor={colors.muted}
-                  multiline
                 />
+
+                <Text style={[shared.label, { color: colors.label }]}>Additional symptoms <Text style={styles.optionalTag}>(optional)</Text></Text>
+                <TextInput
+                  style={[shared.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                  value={symptoms}
+                  onChangeText={setSymptoms}
+                  placeholder="fever, cough, nausea…"
+                  placeholderTextColor={colors.muted}
+                />
+
+                {/* Severity slider approximation — quick-select */}
+                <Text style={[shared.label, { color: colors.label }]}>Severity</Text>
+                <View style={styles.severityRow}>
+                  {['Mild', 'Moderate', 'Severe'].map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.severityBtn,
+                        { borderColor: severity === s
+                            ? (s === 'Severe' ? '#dc2626' : s === 'Moderate' ? '#c2410c' : colors.primary)
+                            : colors.border,
+                          backgroundColor: severity === s
+                            ? (s === 'Severe' ? '#fef2f2' : s === 'Moderate' ? '#fff7ed' : '#eff6ff')
+                            : colors.card,
+                        }]}
+                      onPress={() => setSeverity(s)}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '600',
+                        color: severity === s
+                          ? (s === 'Severe' ? '#dc2626' : s === 'Moderate' ? '#c2410c' : colors.primary)
+                          : colors.muted }}>
+                        {s === 'Mild' ? '😐' : s === 'Moderate' ? '😟' : '😰'} {s}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Duration */}
+                <Text style={[shared.label, { color: colors.label }]}>Duration <Text style={styles.optionalTag}>(optional)</Text></Text>
+                <View style={styles.durationRow}>
+                  {['Today', '2–3 days', '1 week', '1+ month'].map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.durationBtn, { borderColor: duration === d ? colors.primary : colors.border, backgroundColor: duration === d ? colors.primary : colors.card }]}
+                      onPress={() => setDuration(duration === d ? '' : d)}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: duration === d ? '#fff' : colors.muted }}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Image attachment picker */}
                 <TouchableOpacity
-                  style={[styles.sendBtn, (!message.trim() || chatBusy) && styles.sendBtnDisabled]}
-                  onPress={handleChat}
-                  disabled={!message.trim() || chatBusy}
+                  style={[styles.attachBtn, { borderColor: colors.border, backgroundColor: colors.inputBg }]}
+                  onPress={pickImage}
                 >
-                  {chatBusy
+                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+                    📎 {attachmentUri ? 'Change image' : 'Attach image'}
+                  </Text>
+                </TouchableOpacity>
+
+                {attachmentUri ? (
+                  <View style={styles.attachPreview}>
+                    <Image source={{ uri: attachmentUri }} style={styles.attachPreviewImg} resizeMode="cover" />
+                    <TouchableOpacity style={styles.attachRemoveBtn} onPress={() => setAttachmentUri(null)}>
+                      <Text style={styles.attachRemoveText}>✕ Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.sendBtn, (!message.trim() || chatBusy || uploading) && styles.sendBtnDisabled]}
+                  onPress={handleChat}
+                  disabled={!message.trim() || chatBusy || uploading}
+                >
+                  {chatBusy || uploading
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.sendBtnText}>Send Message →</Text>}
+                    : <Text style={styles.sendBtnText}>Get AI Assessment →</Text>}
                 </TouchableOpacity>
               </View>
 
               {/* Chat history */}
-              {chatHistory.length > 0 && (
-                <Text style={styles.sectionLabel}>Conversation History ({chatHistory.length})</Text>
+              {/* Search bar */}
+              <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={styles.searchIcon}>🔍</Text>
+                <TextInput
+                  style={[styles.searchInput, { color: colors.text }]}
+                  value={searchQuery}
+                  onChangeText={async (v) => {
+                    setSearchQuery(v);
+                    if (!v.trim()) { setSearchResults(null); return; }
+                    setSearchBusy(true);
+                    try {
+                      const results = await api.searchChats(v.trim());
+                      setSearchResults(results);
+                    } catch { setSearchResults([]); }
+                    finally { setSearchBusy(false); }
+                  }}
+                  placeholder="Search conversations…"
+                  placeholderTextColor={colors.muted}
+                  returnKeyType="search"
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults(null); }}>
+                    <Text style={{ color: colors.muted, fontSize: 18 }}>✕</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {searchBusy && <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} />}
+
+              {searchResults !== null ? (
+                <>
+                  <Text style={[styles.sectionLabel, { color: colors.text }]}>
+                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery}"
+                  </Text>
+                  {searchResults.length === 0 && (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyIcon}>🔍</Text>
+                      <Text style={styles.emptyTitle}>No matches</Text>
+                      <Text style={styles.emptyDesc}>Try a different keyword.</Text>
+                    </View>
+                  )}
+                  {searchResults.map((item) => (
+                    <ChatCard key={item.id} item={item} onReload={loadData} />
+                  ))}
+                </>
+              ) : (
+                <>
+                  {chatHistory.length > 0 && (
+                    <Text style={[styles.sectionLabel, { color: colors.text }]}>Conversation History ({chatHistory.length})</Text>
+                  )}
+                  {chatHistory.length === 0 && !chatBusy && (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyIcon}>💬</Text>
+                      <Text style={styles.emptyTitle}>No conversations yet</Text>
+                      <Text style={styles.emptyDesc}>Describe your symptoms above and the AI will respond.</Text>
+                    </View>
+                  )}
+                  {chatHistory.map((item) => (
+                    <ChatCard key={item.id} item={item} onReload={loadData} />
+                  ))}
+                </>
               )}
-              {chatHistory.length === 0 && !chatBusy && (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyIcon}>💬</Text>
-                  <Text style={styles.emptyTitle}>No conversations yet</Text>
-                  <Text style={styles.emptyDesc}>Describe your symptoms above and the AI will respond.</Text>
-                </View>
-              )}
-              {chatHistory.map((item) => (
-                <ChatCard key={item.id} item={item} onReload={loadData} />
-              ))}
             </>
           )}
 
@@ -410,12 +584,12 @@ export default function PatientScreen({ user, onLogout }) {
                 </View>
               )}
               {medicalHistory.map((item) => (
-                <View key={item.id} style={styles.historyCard}>
+                <View key={item.id} style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
                   <View style={styles.historyCardLeft} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.historyCondition}>{item.condition}</Text>
-                    {item.notes ? <Text style={styles.historyNotes}>{item.notes}</Text> : null}
-                    <Text style={styles.historyDate}>{formatDate(item.created_at)}</Text>
+                    <Text style={[styles.historyCondition, { color: colors.text }]}>{item.condition}</Text>
+                    {item.notes ? <Text style={[styles.historyNotes, { color: colors.label }]}>{item.notes}</Text> : null}
+                    <Text style={[styles.historyDate, { color: colors.muted }]}>{formatDate(item.created_at)}</Text>
                   </View>
                 </View>
               ))}
@@ -431,14 +605,14 @@ export default function PatientScreen({ user, onLogout }) {
               ) : (
                 <>
                   {/* Avatar card */}
-                  <View style={styles.avatarCard}>
-                    <View style={styles.avatarCircle}>
+                  <View style={[styles.avatarCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
                       <Text style={styles.avatarInitial}>
                         {(profile.user?.name || user.name || '?')[0].toUpperCase()}
                       </Text>
                     </View>
-                    <Text style={styles.avatarName}>{profile.user?.name || user.name}</Text>
-                    <Text style={styles.avatarEmail}>{profile.user?.email || user.email}</Text>
+                    <Text style={[styles.avatarName, { color: colors.text }]}>{profile.user?.name || user.name}</Text>
+                    <Text style={[styles.avatarEmail, { color: colors.muted }]}>{profile.user?.email || user.email}</Text>
                   </View>
 
                   {/* Info grid */}
@@ -452,7 +626,7 @@ export default function PatientScreen({ user, onLogout }) {
                       { label: 'Allergies', value: profile.allergies, icon: '⚠️' },
                     ].map(({ label, value, icon }) =>
                       value ? (
-                        <View key={label} style={styles.infoTile}>
+                        <View key={label} style={[styles.infoTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
                           <Text style={styles.infoTileIcon}>{icon}</Text>
                           <Text style={styles.infoTileValue}>{value}</Text>
                           <Text style={styles.infoTileLabel}>{label}</Text>
@@ -462,7 +636,7 @@ export default function PatientScreen({ user, onLogout }) {
                   </View>
 
                   {/* Stats */}
-                  <View style={styles.statsRow}>
+                  <View style={[styles.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <View style={styles.statBox}>
                       <Text style={styles.statNum}>{chatHistory.length}</Text>
                       <Text style={styles.statLbl}>Chats</Text>
@@ -512,6 +686,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   logoutText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  themeBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  themeBtnText: { fontSize: 16 },
   notifBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 20,
@@ -523,9 +704,8 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 40 },
   sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 12, marginTop: 4 },
 
-  // Input card
+  // Input card — bg set dynamically via inline style
   inputCard: {
-    backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 20,
@@ -547,6 +727,26 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.5 },
   sendBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
+  // Symptom checker
+  severityRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  severityBtn: { flex: 1, borderWidth: 1.5, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  durationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  durationBtn: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+
+  // Search
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 16 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 2 },
+
   // Severity badge
   badge: {
     alignSelf: 'flex-start',
@@ -557,13 +757,13 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 11, fontWeight: '700' },
 
-  // Chat card
+  // Chat card — bg set dynamically
   chatCard: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
     borderLeftWidth: 4,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -589,7 +789,6 @@ const styles = StyleSheet.create({
   reviewedTagText: { fontSize: 11, color: '#16a34a', fontWeight: '600' },
 
   patientMsgBox: {
-    backgroundColor: '#f8fafc',
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
@@ -832,4 +1031,41 @@ const styles = StyleSheet.create({
   statBoxMiddle: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
   statNum: { fontSize: 22, fontWeight: '800', color: colors.primary },
   statLbl: { fontSize: 11, color: colors.muted, marginTop: 2, textTransform: 'uppercase' },
+
+  // Attachment
+  attachBtn: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  attachPreview: {
+    marginBottom: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  attachPreviewImg: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
+  },
+  attachRemoveBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  attachRemoveText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  attachmentImg: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    marginTop: 8,
+  },
 });

@@ -15,7 +15,9 @@ import Alert from '../components/Alert';
 import TabBar from '../components/TabBar';
 import { api } from '../api';
 import { useWebSocket } from '../useWebSocket';
-import { colors, shared } from '../theme';
+import { useTheme } from '../ThemeContext';
+import { usePushNotifications } from '../usePushNotifications';
+import { colors as staticColors, shared as staticShared } from '../theme';
 
 function buildTabs(unreviewedCount) {
   return [
@@ -59,16 +61,18 @@ function ReviewedTag({ isReviewed, reviewedAt }) {
 }
 
 function StatCard({ label, value, color }) {
+  const { colors } = useTheme();
   return (
-    <View style={[styles.statCard, { borderTopColor: color }]}>
+    <View style={[styles.statCard, { borderTopColor: color, backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statLabel, { color: colors.muted }]}>{label}</Text>
     </View>
   );
 }
 
 // ─── Patient Detail ────────────────────────────────────────────────────────────
 function PatientDetail({ patient, onBack, onSaved, doctorId }) {
+  const { colors, shared } = useTheme();
   const [noteForm, setNoteForm] = useState({
     selectedChatId: null,
     notes: '',
@@ -92,7 +96,7 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
     setBusy(true);
     setAlert({ message: '' });
     try {
-      await api.addDoctorNote({
+      const result = await api.addDoctorNote({
         chat_id: noteForm.selectedChatId,
         notes: noteForm.notes,
         diagnosis: noteForm.diagnosis || null,
@@ -100,7 +104,14 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
         message_to_patient: noteForm.message_to_patient || null,
       });
       resetNoteForm();
-      setAlert({ message: 'Note saved and patient notified.', type: 'success' });
+      if (result.interaction_warnings?.length > 0) {
+        setAlert({
+          message: `Note saved.\n\n${result.interaction_warnings.join('\n')}`,
+          type: 'error',
+        });
+      } else {
+        setAlert({ message: 'Note saved and patient notified.', type: 'success' });
+      }
       onSaved();
     } catch (e) {
       setAlert({ message: e.message, type: 'error' });
@@ -146,8 +157,8 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
   const highCount = sortedChats.filter(c => c.severity_level === 'high' && !c.is_reviewed).length;
 
   return (
-    <View style={shared.screen}>
-      <View style={styles.detailHeader}>
+    <View style={[shared.screen, { backgroundColor: colors.bg }]}>
+      <View style={[styles.detailHeader, { backgroundColor: colors.headerBg }]}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
@@ -225,7 +236,7 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
           const sc = SEVERITY_CONFIG[chat.severity_level] || SEVERITY_CONFIG.low;
           const isSelected = noteForm.selectedChatId === chat.id;
           return (
-            <View key={chat.id} style={[shared.card, { borderLeftWidth: 4, borderLeftColor: sc.text }]}>
+            <View key={chat.id} style={[shared.card, { borderLeftWidth: 4, borderLeftColor: sc.text, backgroundColor: colors.card, borderColor: colors.border }]}>
               {/* Header */}
               <View style={styles.chatCardHeader}>
                 <SeverityBadge level={chat.severity_level} />
@@ -338,6 +349,8 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
 
 // ─── Main Doctor Screen ────────────────────────────────────────────────────────
 export default function DoctorScreen({ user, onLogout }) {
+  const { colors, shared, dark, toggle: toggleTheme } = useTheme();
+  usePushNotifications(true);
   const [tab, setTab] = useState('dashboard');
   const [patients, setPatients] = useState([]);
   const [flaggedChats, setFlaggedChats] = useState([]);
@@ -418,13 +431,16 @@ export default function DoctorScreen({ user, onLogout }) {
   );
 
   return (
-    <View style={shared.screen}>
+    <View style={[shared.screen, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.topBar}>
-        <View>
+      <View style={[styles.topBar, { backgroundColor: colors.headerBg }]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.topName}>Dr. {user.name}</Text>
           <Text style={styles.topRole}>Secure Doctor Portal</Text>
         </View>
+        <TouchableOpacity style={styles.themeBtn} onPress={toggleTheme}>
+          <Text style={{ fontSize: 16 }}>{dark ? '☀️' : '🌙'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
@@ -579,7 +595,8 @@ export default function DoctorScreen({ user, onLogout }) {
 }
 
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f766e', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 16 },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 16, gap: 8 },
+  themeBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
   topName: { fontSize: 17, fontWeight: '700', color: '#fff' },
   topRole: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
   logoutBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },

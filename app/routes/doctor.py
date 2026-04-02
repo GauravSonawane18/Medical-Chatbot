@@ -17,6 +17,11 @@ from app.services.doctor_service import (
 )
 from app.utils.dependencies import require_roles
 from app.websocket.manager import manager
+from app.models.audit_log import AuditLog
+from app.models.patient import Patient as PatientModel
+from app.services.interaction_service import check_interactions
+from app.services.push_service import notify_user
+from sqlalchemy import select as sa_select
 
 router = APIRouter()
 
@@ -65,14 +70,26 @@ def review_chat(
     return ReviewResponse(id=chat.id, is_reviewed=chat.is_reviewed, reviewed_at=chat.reviewed_at)
 
 
-@router.post("/doctor/notes", response_model=DoctorNoteResponse, status_code=status.HTTP_201_CREATED)
+class DoctorNoteWithWarnings(DoctorNoteResponse):
+    interaction_warnings: list[str] = []
+
+
+@router.post("/doctor/notes", response_model=DoctorNoteWithWarnings, status_code=status.HTTP_201_CREATED)
 async def create_doctor_note(
     payload: DoctorNoteCreate,
     current_doctor: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),
     db: Session = Depends(get_db),
-) -> DoctorNoteResponse:
+) -> DoctorNoteWithWarnings:
     note = add_doctor_note(db, current_doctor, payload)
-    patient = db.get(Patient, note.patient_id)
+
+    # Medication interaction check
+    patient_record = db.get(PatientModel, note.patient_id)
+    warnings = check_interactions(
+        patient_record.allergies if patient_record else None,
+        payload.recommendation,
+    )
+
+    patient = patient_record
     if patient:
         await manager.send_to(patient.user_id, {
             "type": "doctor_note",
@@ -89,7 +106,44 @@ async def create_doctor_note(
                 "created_at": note.created_at.isoformat(),
             },
         })
-    return note
+
+    # Push notification to patient
+    if patient:
+        notif_body = note.message_to_patient or "Your doctor has reviewed your case and added notes."
+        await notify_user(db, patient.user_id, "Doctor Update", notif_body, {"type": "doctor_note", "chat_id": note.chat_id})
+
+    result = DoctorNoteWithWarnings.model_validate(note)
+    result.interaction_warnings = warnings
+    return result
+
+
+@router.post("/doctor/push-token", status_code=204)
+def register_doctor_push_token(
+    payload: dict,
+    current_doctor: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> None:
+    from app.services.push_service import save_push_token
+    save_push_token(db, current_doctor.id, payload.get("token", ""))
+
+
+@router.get("/doctor/audit-log")
+def get_audit_log(
+    _: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),
+    db: Session = Depends(get_db),
+    limit: int = 100,
+) -> list[dict]:
+    rows = db.execute(
+        sa_select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
+    ).scalars().all()
+    return [
+        {
+            "id": r.id, "user_id": r.user_id, "action": r.action,
+            "resource": r.resource, "resource_id": r.resource_id,
+            "detail": r.detail, "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
 
 
 @router.post(
