@@ -8,6 +8,7 @@ from app.schemas.doctor import DoctorNoteResponse, PatientReplyCreate
 from app.schemas.patient import MedicalHistoryResponse, PatientSummaryResponse
 from app.services.chat_service import process_patient_chat
 from app.services.doctor_service import reply_to_note
+from app.websocket.manager import manager
 from app.services.patient_service import get_medical_history_for_patient, get_patient_summary, list_chat_history
 from app.utils.dependencies import get_current_patient
 
@@ -48,13 +49,23 @@ def get_medical_history(
 
 
 @router.post("/notes/{note_id}/reply", response_model=DoctorNoteResponse)
-def reply_to_doctor_note(
+async def reply_to_doctor_note(
     note_id: int,
     payload: PatientReplyCreate,
     patient: Patient = Depends(get_current_patient),
     db: Session = Depends(get_db),
 ) -> DoctorNoteResponse:
-    return reply_to_note(db, note_id, patient.id, payload.reply)
+    note = reply_to_note(db, note_id, patient.id, payload.reply)
+    # Push reply to the doctor in real-time (doctor_id == user_id for doctors)
+    await manager.send_to(note.doctor_id, {
+        "type": "patient_reply",
+        "note_id": note.id,
+        "chat_id": note.chat_id,
+        "patient_id": patient.id,
+        "patient_reply": note.patient_reply,
+        "patient_reply_at": note.patient_reply_at.isoformat() if note.patient_reply_at else None,
+    })
+    return note
 
 
 @router.get("/me", response_model=PatientSummaryResponse)

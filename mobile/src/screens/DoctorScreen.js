@@ -14,6 +14,7 @@ import {
 import Alert from '../components/Alert';
 import TabBar from '../components/TabBar';
 import { api } from '../api';
+import { useWebSocket } from '../useWebSocket';
 import { colors, shared } from '../theme';
 
 function buildTabs(unreviewedCount) {
@@ -360,6 +361,27 @@ export default function DoctorScreen({ user, onLogout }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Real-time: patient replies to a doctor note → update in-place
+  useWebSocket((event) => {
+    if (event.type === 'patient_reply') {
+      setSelectedPatient((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          chats: prev.chats?.map((chat) => ({
+            ...chat,
+            doctor_notes: chat.doctor_notes?.map((n) =>
+              n.id === event.note_id
+                ? { ...n, patient_reply: event.patient_reply, patient_reply_at: event.patient_reply_at }
+                : n
+            ),
+          })),
+        };
+      });
+      loadData();
+    }
+  });
 
   async function onRefresh() {
     setRefreshing(true);

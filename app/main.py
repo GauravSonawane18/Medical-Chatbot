@@ -12,6 +12,7 @@ from app.database.session import engine
 from app.routes.auth import router as auth_router
 from app.routes.doctor import router as doctor_router
 from app.routes.patient import router as patient_router
+from app.routes.ws import router as ws_router
 from app.utils.logging import configure_logging
 
 settings = get_settings()
@@ -54,6 +55,7 @@ if FRONTEND_ASSETS_DIR.exists():
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(patient_router, tags=["Patient"])
 app.include_router(doctor_router, tags=["Doctor"])
+app.include_router(ws_router, tags=["WebSocket"])
 
 
 def serve_frontend_file(*candidates: Path) -> FileResponse:

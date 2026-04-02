@@ -14,6 +14,7 @@ import {
 import Alert from '../components/Alert';
 import TabBar from '../components/TabBar';
 import { api } from '../api';
+import { useWebSocket } from '../useWebSocket';
 import { colors, shared } from '../theme';
 
 const TABS = [
@@ -224,6 +225,25 @@ export default function PatientScreen({ user, onLogout }) {
   const [message, setMessage] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const scrollRef = useRef(null);
+
+  // Real-time: doctor sends a note/message → update that chat immediately
+  useWebSocket((event) => {
+    if (event.type === 'doctor_note') {
+      setChatHistory((prev) =>
+        prev.map((chat) => {
+          if (chat.id !== event.chat_id) return chat;
+          const notes = chat.doctor_notes || [];
+          const exists = notes.some((n) => n.id === event.note.id);
+          return {
+            ...chat,
+            doctor_notes: exists
+              ? notes.map((n) => (n.id === event.note.id ? event.note : n))
+              : [...notes, event.note],
+          };
+        })
+      );
+    }
+  });
 
   const loadData = useCallback(async () => {
     try {

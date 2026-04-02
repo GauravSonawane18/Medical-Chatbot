@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models.enums import UserRole
+from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.doctor import DoctorNoteCreate, DoctorNoteResponse, FlaggedConversationResponse, ReviewResponse
 from app.schemas.patient import MedicalHistoryCreate, MedicalHistoryResponse, PatientDetailResponse, PatientSummaryResponse
@@ -15,6 +16,7 @@ from app.services.doctor_service import (
     mark_chat_reviewed,
 )
 from app.utils.dependencies import require_roles
+from app.websocket.manager import manager
 
 router = APIRouter()
 
@@ -64,12 +66,30 @@ def review_chat(
 
 
 @router.post("/doctor/notes", response_model=DoctorNoteResponse, status_code=status.HTTP_201_CREATED)
-def create_doctor_note(
+async def create_doctor_note(
     payload: DoctorNoteCreate,
     current_doctor: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> DoctorNoteResponse:
-    return add_doctor_note(db, current_doctor, payload)
+    note = add_doctor_note(db, current_doctor, payload)
+    patient = db.get(Patient, note.patient_id)
+    if patient:
+        await manager.send_to(patient.user_id, {
+            "type": "doctor_note",
+            "chat_id": note.chat_id,
+            "note": {
+                "id": note.id,
+                "doctor_id": note.doctor_id,
+                "notes": note.notes,
+                "diagnosis": note.diagnosis,
+                "recommendation": note.recommendation,
+                "message_to_patient": note.message_to_patient,
+                "patient_reply": note.patient_reply,
+                "patient_reply_at": None,
+                "created_at": note.created_at.isoformat(),
+            },
+        })
+    return note
 
 
 @router.post(
