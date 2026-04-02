@@ -96,6 +96,18 @@ def mark_chat_reviewed(db: Session, chat_id: int) -> Chat:
     return chat
 
 
+def reply_to_note(db: Session, note_id: int, patient_id: int, reply: str) -> DoctorNote:
+    from datetime import datetime, timezone
+    note = db.scalar(select(DoctorNote).where(DoctorNote.id == note_id, DoctorNote.patient_id == patient_id))
+    if note is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found.")
+    note.patient_reply = reply
+    note.patient_reply_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(note)
+    return note
+
+
 def add_medical_history_entry(db: Session, payload: MedicalHistoryCreate) -> MedicalHistory:
     _get_patient_or_404(db, payload.patient_id)
 

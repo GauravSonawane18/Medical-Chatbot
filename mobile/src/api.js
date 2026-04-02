@@ -67,6 +67,8 @@ export const api = {
   getMedicalHistory: () => request('/medical-history'),
   sendChat: (body) => request('/chat', { method: 'POST', body }),
 
+  replyToNote: (noteId, body) => request(`/notes/${noteId}/reply`, { method: 'POST', body }),
+
   getPatients: () => request('/patients'),
   getPatient: (id) => request(`/patients/${id}`),
   getFlaggedChats: () => request('/doctor/flagged-chats'),

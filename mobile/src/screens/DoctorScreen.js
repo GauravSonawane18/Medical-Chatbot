@@ -266,6 +266,12 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
                           <Text style={styles.msgToPatientText}>{n.message_to_patient}</Text>
                         </View>
                       )}
+                      {n.patient_reply && (
+                        <View style={styles.patientReplyBox}>
+                          <Text style={styles.patientReplyLabel}>↩ Patient replied · {n.patient_reply_at ? formatDate(n.patient_reply_at) : ''}</Text>
+                          <Text style={styles.patientReplyText}>{n.patient_reply}</Text>
+                        </View>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -617,4 +623,7 @@ const styles = StyleSheet.create({
   replyForm: { marginTop: 12, backgroundColor: '#f8fafc', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border },
   replyFormTitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 },
   msgLabel: { color: colors.primary },
+  patientReplyBox: { marginTop: 8, backgroundColor: '#f0f9ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#bae6fd' },
+  patientReplyLabel: { fontSize: 10, fontWeight: '700', color: '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
+  patientReplyText: { fontSize: 13, color: colors.text, lineHeight: 18 },
 });

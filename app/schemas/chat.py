@@ -19,6 +19,8 @@ class ChatDoctorNote(BaseModel):
     diagnosis: str | None
     recommendation: str | None
     message_to_patient: str | None
+    patient_reply: str | None
+    patient_reply_at: datetime | None
     created_at: datetime
 
 

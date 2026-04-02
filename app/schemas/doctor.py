@@ -13,6 +13,10 @@ class DoctorNoteCreate(BaseModel):
     message_to_patient: str | None = Field(default=None, max_length=2000)
 
 
+class PatientReplyCreate(BaseModel):
+    reply: str = Field(min_length=1, max_length=2000)
+
+
 class DoctorNoteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,6 +28,8 @@ class DoctorNoteResponse(BaseModel):
     diagnosis: str | None
     recommendation: str | None
     message_to_patient: str | None
+    patient_reply: str | None
+    patient_reply_at: datetime | None
     created_at: datetime
 
 

@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 from time import perf_counter
 
 from fastapi import HTTPException, status
@@ -10,11 +11,17 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def generate_with_openai(prompt: str) -> str:
-    client = OpenAI(
+@lru_cache(maxsize=1)
+def _get_client() -> OpenAI:
+    return OpenAI(
         api_key=settings.openai_api_key,
         base_url=settings.openai_base_url or None,
+        timeout=20.0,
     )
+
+
+def generate_with_openai(prompt: str) -> str:
+    client = _get_client()
     started_at = perf_counter()
 
     try:
@@ -31,7 +38,7 @@ def generate_with_openai(prompt: str) -> str:
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=300,
+            max_tokens=200,
             temperature=0.2,
         )
         text = (response.choices[0].message.content or "").strip()

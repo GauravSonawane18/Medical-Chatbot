@@ -19,6 +19,8 @@ class DoctorNote(Base):
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
     message_to_patient: Mapped[str | None] = mapped_column(Text, nullable=True)
+    patient_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    patient_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -48,7 +48,28 @@ function SeverityBadge({ level, flagged }) {
   );
 }
 
-function DoctorNoteCard({ note }) {
+function DoctorNoteCard({ note, onReload }) {
+  const [replyText, setReplyText] = useState('');
+  const [showReply, setShowReply] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function sendReply() {
+    if (!replyText.trim()) return;
+    setBusy(true);
+    setErr('');
+    try {
+      await api.replyToNote(note.id, { reply: replyText.trim() });
+      setReplyText('');
+      setShowReply(false);
+      await onReload();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <View style={styles.doctorNoteCard}>
       <View style={styles.doctorNoteHeader}>
@@ -82,11 +103,59 @@ function DoctorNoteCard({ note }) {
           <Text style={styles.msgToPatientText}>{note.message_to_patient}</Text>
         </View>
       ) : null}
+
+      {/* Patient's existing reply */}
+      {note.patient_reply ? (
+        <View style={styles.patientReplyBox}>
+          <Text style={styles.patientReplyLabel}>You replied · {formatDate(note.patient_reply_at)}</Text>
+          <Text style={styles.patientReplyText}>{note.patient_reply}</Text>
+          <TouchableOpacity onPress={() => setShowReply(true)} style={styles.editReplyBtn}>
+            <Text style={styles.editReplyBtnText}>Edit reply</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {/* Reply button — only if doctor sent a message */}
+      {note.message_to_patient && !note.patient_reply && !showReply ? (
+        <TouchableOpacity style={styles.replyTriggerBtn} onPress={() => setShowReply(true)}>
+          <Text style={styles.replyTriggerText}>↩ Reply to doctor</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {/* Reply input */}
+      {showReply ? (
+        <View style={styles.replyInputBox}>
+          {err ? <Text style={styles.replyErr}>{err}</Text> : null}
+          <TextInput
+            style={styles.replyInput}
+            value={replyText}
+            onChangeText={setReplyText}
+            placeholder="Type your reply to the doctor…"
+            placeholderTextColor={colors.muted}
+            multiline
+            autoFocus
+          />
+          <View style={styles.replyActions}>
+            <TouchableOpacity style={styles.cancelReplyBtn} onPress={() => { setShowReply(false); setReplyText(''); setErr(''); }}>
+              <Text style={styles.cancelReplyText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendReplyBtn, (!replyText.trim() || busy) && { opacity: 0.5 }]}
+              onPress={sendReply}
+              disabled={!replyText.trim() || busy}
+            >
+              {busy
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.sendReplyText}>Send Reply</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function ChatCard({ item }) {
+function ChatCard({ item, onReload }) {
   const sc = SEVERITY_CONFIG[item.severity_level] || SEVERITY_CONFIG.low;
   const hasDoctorNotes = item.doctor_notes?.length > 0;
 
@@ -117,7 +186,12 @@ function ChatCard({ item }) {
       {/* AI response */}
       <View style={styles.aiMsgBox}>
         <Text style={styles.aiMsgLabel}>AI Assistant</Text>
-        <Text style={styles.aiMsgText}>{item.response}</Text>
+        {item.response === null
+          ? <View style={styles.typingRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.typingText}>Thinking…</Text>
+            </View>
+          : <Text style={styles.aiMsgText}>{item.response}</Text>}
       </View>
 
       {/* Risk reason — only show if flagged */}
@@ -131,7 +205,7 @@ function ChatCard({ item }) {
       {hasDoctorNotes && (
         <View style={styles.doctorNotesSection}>
           {item.doctor_notes.map((note) => (
-            <DoctorNoteCard key={note.id} note={note} />
+            <DoctorNoteCard key={note.id} note={note} onReload={onReload} />
           ))}
         </View>
       )}
@@ -176,15 +250,41 @@ export default function PatientScreen({ user, onLogout }) {
 
   async function handleChat() {
     if (!message.trim()) return;
+    const userMsg = message.trim();
+    const userSymptoms = symptoms.trim();
+
+    // Optimistic: show message immediately as a pending card
+    const tempId = `pending-${Date.now()}`;
+    setChatHistory((prev) => [
+      {
+        id: tempId,
+        message: userMsg,
+        symptoms: userSymptoms || null,
+        response: null, // null = still loading
+        severity_level: 'low',
+        is_flagged: false,
+        is_reviewed: false,
+        reviewed_at: null,
+        risk_reason: null,
+        doctor_notes: [],
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+    setMessage('');
+    setSymptoms('');
     setChatBusy(true);
     setAlert({ message: '' });
+
     try {
-      await api.sendChat({ message, symptoms: symptoms || null });
-      setMessage('');
-      setSymptoms('');
+      await api.sendChat({ message: userMsg, symptoms: userSymptoms || null });
       await loadData();
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     } catch (e) {
+      // Remove the temp card and restore the input on error
+      setChatHistory((prev) => prev.filter((c) => c.id !== tempId));
+      setMessage(userMsg);
+      setSymptoms(userSymptoms);
       setAlert({ message: e.message, type: 'error' });
     } finally {
       setChatBusy(false);
@@ -273,7 +373,7 @@ export default function PatientScreen({ user, onLogout }) {
                 </View>
               )}
               {chatHistory.map((item) => (
-                <ChatCard key={item.id} item={item} />
+                <ChatCard key={item.id} item={item} onReload={loadData} />
               ))}
             </>
           )}
@@ -500,6 +600,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   aiMsgText: { fontSize: 13, color: colors.label, lineHeight: 19 },
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  typingText: { fontSize: 13, color: colors.primary, fontStyle: 'italic' },
 
   riskBox: {
     borderRadius: 8,
@@ -559,6 +661,70 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   msgToPatientText: { fontSize: 14, color: colors.text, lineHeight: 20, fontWeight: '500' },
+
+  // Patient reply
+  replyTriggerBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  replyTriggerText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  patientReplyBox: {
+    marginTop: 10,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  patientReplyLabel: { fontSize: 10, fontWeight: '700', color: '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
+  patientReplyText: { fontSize: 13, color: colors.text, lineHeight: 18 },
+  editReplyBtn: { marginTop: 6, alignSelf: 'flex-start' },
+  editReplyBtnText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
+  replyInputBox: {
+    marginTop: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  replyInput: {
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    color: colors.text,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+  replyActions: { flexDirection: 'row', gap: 8 },
+  cancelReplyBtn: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  cancelReplyText: { fontSize: 13, color: colors.muted, fontWeight: '600' },
+  sendReplyBtn: {
+    flex: 2,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  sendReplyText: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  replyErr: { fontSize: 12, color: colors.danger, marginBottom: 6 },
 
   // Empty state
   emptyState: {
