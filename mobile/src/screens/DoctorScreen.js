@@ -159,7 +159,8 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Alert message={alert.message} type={alert.type} />
 
         {/* Patient Info */}
@@ -321,6 +322,7 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
           );
         })}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
