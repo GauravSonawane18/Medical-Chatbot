@@ -1,8 +1,8 @@
 import { getToken } from './storage';
 
-// Android emulator → host machine: 10.0.2.2
-// Physical device  → your LAN IP, e.g. 192.168.1.x
-export const API_BASE_URL = 'http://10.0.2.2:8000';
+// Physical device (Android + iOS): use your PC's LAN IP
+// Android emulator only: use 10.0.2.2
+export const API_BASE_URL = 'http://10.187.101.163:8000';
 
 async function request(path, options = {}) {
   const token = options.skipAuth ? null : await getToken();
