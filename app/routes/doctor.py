@@ -35,6 +35,15 @@ def get_patient(
     return get_patient_details(db, patient_id)
 
 
+@router.get("/doctor/notifications")
+def get_notifications(
+    _: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> dict:
+    flagged = list_flagged_conversations(db)
+    return {"unread_count": len(flagged)}
+
+
 @router.get("/doctor/flagged-chats", response_model=list[FlaggedConversationResponse])
 def get_flagged_chats(
     _: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),

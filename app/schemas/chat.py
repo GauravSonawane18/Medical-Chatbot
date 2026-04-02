@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,6 +8,16 @@ from app.models.enums import SeverityLevel
 class ChatRequest(BaseModel):
     message: str = Field(min_length=2, max_length=3000)
     symptoms: str | None = Field(default=None, max_length=1000)
+
+
+class ChatDoctorNote(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    doctor_id: int
+    notes: str
+    diagnosis: str | None
+    created_at: datetime
 
 
 class ChatHistoryItem(BaseModel):
@@ -21,6 +31,7 @@ class ChatHistoryItem(BaseModel):
     is_flagged: bool
     risk_reason: str | None
     created_at: datetime
+    doctor_notes: list[ChatDoctorNote] = []
 
 
 class ChatResponse(BaseModel):

@@ -31,6 +31,8 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
             phone_number=payload.phone_number,
             blood_group=payload.blood_group,
             allergies=payload.allergies,
+            weight=payload.weight,
+            weight_unit=payload.weight_unit,
         )
         db.add(patient)
 

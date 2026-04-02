@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -6,7 +6,7 @@ from app.models.enums import SeverityLevel
 
 
 class DoctorNoteCreate(BaseModel):
-    patient_id: int
+    chat_id: int
     notes: str = Field(min_length=2, max_length=4000)
     diagnosis: str | None = Field(default=None, max_length=2000)
 
@@ -17,6 +17,7 @@ class DoctorNoteResponse(BaseModel):
     id: int
     doctor_id: int
     patient_id: int
+    chat_id: int | None
     notes: str
     diagnosis: str | None
     created_at: datetime

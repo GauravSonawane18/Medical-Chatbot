@@ -41,6 +41,8 @@ class PatientSummaryResponse(BaseModel):
     phone_number: str | None
     blood_group: str | None
     allergies: str | None
+    weight: float | None
+    weight_unit: str | None
     created_at: datetime
     user: UserResponse
 

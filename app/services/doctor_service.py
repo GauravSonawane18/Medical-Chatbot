@@ -64,11 +64,14 @@ def list_flagged_conversations(db: Session, limit: int = 100) -> list[FlaggedCon
 
 
 def add_doctor_note(db: Session, current_doctor: User, payload: DoctorNoteCreate) -> DoctorNote:
-    _get_patient_or_404(db, payload.patient_id)
+    chat = db.scalar(select(Chat).where(Chat.id == payload.chat_id))
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
 
     note = DoctorNote(
         doctor_id=current_doctor.id,
-        patient_id=payload.patient_id,
+        patient_id=chat.patient_id,
+        chat_id=chat.id,
         notes=payload.notes,
         diagnosis=payload.diagnosis,
     )

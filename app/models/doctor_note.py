@@ -14,6 +14,7 @@ class DoctorNote(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     doctor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
+    chat_id: Mapped[int | None] = mapped_column(ForeignKey("chats.id", ondelete="SET NULL"), nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=False)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -24,3 +25,4 @@ class DoctorNote(Base):
 
     doctor: Mapped["User"] = relationship(back_populates="doctor_notes")
     patient: Mapped["Patient"] = relationship(back_populates="doctor_notes")
+    chat: Mapped["Chat"] = relationship(back_populates="doctor_notes")

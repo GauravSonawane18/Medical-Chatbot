@@ -145,6 +145,19 @@ def process_patient_chat(db: Session, patient: Patient, payload: ChatRequest) ->
         risk_reason=risk.reason,
     )
     db.add(chat)
+    db.flush()
+
+    if risk.is_flagged:
+        condition = f"[Auto-flagged] {risk.reason or 'High-risk chat flagged for review'}"
+        notes = f"Patient message: {payload.message}"
+        if payload.symptoms:
+            notes += f"\nSymptoms: {payload.symptoms}"
+        db.add(MedicalHistory(
+            patient_id=patient.id,
+            condition=condition,
+            notes=notes,
+        ))
+
     db.commit()
     db.refresh(chat)
     return chat

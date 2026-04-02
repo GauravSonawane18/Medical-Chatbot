@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.chat import Chat
+from app.models.doctor_note import DoctorNote
 from app.models.medical_history import MedicalHistory
 from app.models.patient import Patient
 
@@ -25,11 +26,12 @@ def get_patient_summary(db: Session, patient_id: int) -> Patient:
 def list_chat_history(db: Session, patient_id: int, limit: int = 50) -> list[Chat]:
     statement = (
         select(Chat)
+        .options(joinedload(Chat.doctor_notes))
         .where(Chat.patient_id == patient_id)
         .order_by(Chat.created_at.desc())
         .limit(limit)
     )
-    return list(db.scalars(statement).all())
+    return list(db.scalars(statement).unique().all())
 
 
 def get_medical_history_for_patient(db: Session, patient_id: int, limit: int = 50) -> list[MedicalHistory]:

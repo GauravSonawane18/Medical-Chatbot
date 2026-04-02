@@ -160,14 +160,31 @@ export default function PatientScreen({ user, onLogout }) {
               )}
               {chatHistory.map((item) => (
                 <View key={item.id} style={shared.card}>
-                  <SeverityBadge level={item.severity_level} flagged={item.is_flagged} />
+                  <View style={styles.chatHeader}>
+                    <SeverityBadge level={item.severity_level} flagged={item.is_flagged} />
+                    <Text style={shared.muted}>{formatDate(item.created_at)}</Text>
+                  </View>
                   <Text style={styles.chatMessage}>{item.message}</Text>
                   {item.symptoms ? (
                     <Text style={shared.muted}>Symptoms: {item.symptoms}</Text>
                   ) : null}
                   <View style={shared.divider} />
                   <Text style={styles.chatResponse}>{item.response}</Text>
-                  <Text style={[shared.muted, { marginTop: 6 }]}>{formatDate(item.created_at)}</Text>
+
+                  {item.doctor_notes?.length > 0 && (
+                    <View style={styles.doctorRepliesBox}>
+                      <Text style={styles.doctorRepliesLabel}>Doctor replies</Text>
+                      {item.doctor_notes.map((note) => (
+                        <View key={note.id} style={styles.doctorReply}>
+                          <Text style={styles.doctorReplyTitle}>
+                            {note.diagnosis ? `Diagnosis: ${note.diagnosis}` : 'Doctor note'}
+                          </Text>
+                          <Text style={styles.doctorReplyText}>{note.notes}</Text>
+                          <Text style={shared.muted}>{formatDate(note.created_at)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               ))}
             </>
@@ -200,6 +217,7 @@ export default function PatientScreen({ user, onLogout }) {
                     ['Age', profile.age],
                     ['Gender', profile.gender],
                     ['Blood Group', profile.blood_group],
+                    ['Weight', profile.weight ? `${profile.weight} ${profile.weight_unit || ''}` : null],
                     ['Phone', profile.phone_number],
                     ['Allergies', profile.allergies],
                   ].map(([label, val]) => (
@@ -250,4 +268,10 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   metaLabel: { fontSize: 13, color: colors.muted, flex: 1 },
   metaValue: { fontSize: 13, color: colors.text, fontWeight: '600', flex: 2, textAlign: 'right' },
+  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  doctorRepliesBox: { marginTop: 12, backgroundColor: '#eff6ff', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  doctorRepliesLabel: { fontSize: 11, fontWeight: '700', color: colors.primary, textTransform: 'uppercase', marginBottom: 8 },
+  doctorReply: { marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#bfdbfe' },
+  doctorReplyTitle: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  doctorReplyText: { fontSize: 13, color: colors.label, lineHeight: 18 },
 });

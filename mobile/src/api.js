@@ -59,6 +59,7 @@ export const api = {
   getPatients: () => request('/patients'),
   getPatient: (id) => request(`/patients/${id}`),
   getFlaggedChats: () => request('/doctor/flagged-chats'),
+  getNotifications: () => request('/doctor/notifications'),
   addDoctorNote: (body) => request('/doctor/notes', { method: 'POST', body }),
   addMedicalHistory: (body) => request('/doctor/medical-history', { method: 'POST', body }),
 };

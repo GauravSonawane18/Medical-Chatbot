@@ -31,3 +31,8 @@ class Chat(Base):
     )
 
     patient: Mapped["Patient"] = relationship(back_populates="chats")
+    doctor_notes: Mapped[list["DoctorNote"]] = relationship(
+        back_populates="chat",
+        cascade="all, delete-orphan",
+        order_by="asc(DoctorNote.created_at)",
+    )

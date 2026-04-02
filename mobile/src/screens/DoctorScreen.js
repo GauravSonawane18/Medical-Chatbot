@@ -16,10 +16,12 @@ import TabBar from '../components/TabBar';
 import { api } from '../api';
 import { colors, shared } from '../theme';
 
-const TABS = [
-  { key: 'patients', label: 'Patients' },
-  { key: 'flagged', label: 'Flagged' },
-];
+function buildTabs(flaggedCount) {
+  return [
+    { key: 'patients', label: 'Patients' },
+    { key: 'flagged', label: flaggedCount > 0 ? `Flagged (${flaggedCount})` : 'Flagged' },
+  ];
+}
 
 function formatDate(v) {
   if (!v) return '';
@@ -42,22 +44,22 @@ function SeverityBadge({ level }) {
 }
 
 function PatientDetail({ patient, onBack, onSaved }) {
-  const [noteForm, setNoteForm] = useState({ notes: '', diagnosis: '' });
+  const [noteForm, setNoteForm] = useState({ notes: '', diagnosis: '', selectedChatId: null });
   const [historyForm, setHistoryForm] = useState({ condition: '', notes: '' });
   const [alert, setAlert] = useState({ message: '', type: 'error' });
   const [busy, setBusy] = useState(false);
 
   async function saveNote() {
-    if (!noteForm.notes.trim()) return;
+    if (!noteForm.notes.trim() || !noteForm.selectedChatId) return;
     setBusy(true);
     setAlert({ message: '' });
     try {
       await api.addDoctorNote({
-        patient_id: patient.id,
+        chat_id: noteForm.selectedChatId,
         notes: noteForm.notes,
         diagnosis: noteForm.diagnosis || null,
       });
-      setNoteForm({ notes: '', diagnosis: '' });
+      setNoteForm({ notes: '', diagnosis: '', selectedChatId: null });
       setAlert({ message: 'Note saved.', type: 'success' });
       onSaved();
     } catch (e) {
@@ -140,41 +142,67 @@ function PatientDetail({ patient, onBack, onSaved }) {
           <Text style={[shared.muted, { marginBottom: 12 }]}>No notes yet.</Text>
         )}
 
-        <Text style={styles.sectionTitle}>Recent Chats</Text>
+        <Text style={styles.sectionTitle}>Chats & Reply</Text>
         {patient.chats?.length ? (
           patient.chats.map((item) => (
-            <View key={item.id} style={shared.card}>
-              <SeverityBadge level={item.severity_level} />
+            <View key={item.id} style={[shared.card, item.is_flagged && { borderLeftWidth: 3, borderLeftColor: colors.danger }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <SeverityBadge level={item.severity_level} />
+                <Text style={shared.muted}>{formatDate(item.created_at)}</Text>
+              </View>
               <Text style={styles.chatMsg}>{item.message}</Text>
-              <Text style={shared.muted}>{item.response}</Text>
+              {item.symptoms ? <Text style={shared.muted}>Symptoms: {item.symptoms}</Text> : null}
+              <Text style={[shared.muted, { marginTop: 4 }]}>{item.response}</Text>
+
+              {item.doctor_notes?.length > 0 && (
+                <View style={styles.existingNotes}>
+                  {item.doctor_notes.map((n) => (
+                    <View key={n.id} style={styles.existingNote}>
+                      <Text style={styles.existingNoteTitle}>{n.diagnosis || 'Doctor note'}</Text>
+                      <Text style={shared.muted}>{n.notes}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {item.is_flagged && (
+                <TouchableOpacity
+                  style={[styles.replyBtn, noteForm.selectedChatId === item.id && styles.replyBtnActive]}
+                  onPress={() => setNoteForm((f) => ({ ...f, selectedChatId: f.selectedChatId === item.id ? null : item.id }))}
+                >
+                  <Text style={[styles.replyBtnText, noteForm.selectedChatId === item.id && { color: '#fff' }]}>
+                    {noteForm.selectedChatId === item.id ? 'Cancel reply' : '+ Reply to this chat'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {noteForm.selectedChatId === item.id && (
+                <View style={styles.replyForm}>
+                  <Text style={shared.label}>Notes</Text>
+                  <TextInput
+                    style={[shared.textarea, { height: 80 }]}
+                    value={noteForm.notes}
+                    onChangeText={(v) => setNoteForm((f) => ({ ...f, notes: v }))}
+                    placeholder="Follow-up observation…"
+                    multiline
+                  />
+                  <Text style={shared.label}>Diagnosis (optional)</Text>
+                  <TextInput
+                    style={shared.input}
+                    value={noteForm.diagnosis}
+                    onChangeText={(v) => setNoteForm((f) => ({ ...f, diagnosis: v }))}
+                    placeholder="Stage 1 hypertension"
+                  />
+                  <TouchableOpacity style={[shared.primaryBtn, busy && { opacity: 0.6 }]} onPress={saveNote} disabled={busy}>
+                    <Text style={shared.primaryBtnText}>{busy ? 'Saving…' : 'Send Reply'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))
         ) : (
           <Text style={[shared.muted, { marginBottom: 12 }]}>No chats recorded.</Text>
         )}
-
-        <View style={shared.divider} />
-        <Text style={styles.sectionTitle}>Add Doctor Note</Text>
-        <View style={shared.card}>
-          <Text style={shared.label}>Notes</Text>
-          <TextInput
-            style={[shared.textarea, { height: 90 }]}
-            value={noteForm.notes}
-            onChangeText={(v) => setNoteForm((f) => ({ ...f, notes: v }))}
-            placeholder="Follow-up observation…"
-            multiline
-          />
-          <Text style={shared.label}>Diagnosis (optional)</Text>
-          <TextInput
-            style={shared.input}
-            value={noteForm.diagnosis}
-            onChangeText={(v) => setNoteForm((f) => ({ ...f, diagnosis: v }))}
-            placeholder="Stage 1 hypertension"
-          />
-          <TouchableOpacity style={[shared.primaryBtn, busy && { opacity: 0.6 }]} onPress={saveNote} disabled={busy}>
-            <Text style={shared.primaryBtnText}>{busy ? 'Saving…' : 'Save Note'}</Text>
-          </TouchableOpacity>
-        </View>
 
         <Text style={styles.sectionTitle}>Add Medical History</Text>
         <View style={shared.card}>
@@ -333,7 +361,7 @@ export default function DoctorScreen({ user, onLogout }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <TabBar tabs={TABS} active={tab} onSelect={setTab} />
+      <TabBar tabs={buildTabs(flaggedChats.length)} active={tab} onSelect={setTab} />
     </View>
   );
 }
@@ -386,4 +414,11 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   metaLabel: { fontSize: 13, color: colors.muted },
   metaValue: { fontSize: 13, color: colors.text, fontWeight: '600' },
+  replyBtn: { marginTop: 10, borderRadius: 6, borderWidth: 1, borderColor: colors.primary, paddingVertical: 8, alignItems: 'center' },
+  replyBtnActive: { backgroundColor: colors.primary },
+  replyBtnText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  replyForm: { marginTop: 10, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8 },
+  existingNotes: { marginTop: 8, backgroundColor: '#eff6ff', borderRadius: 6, padding: 8 },
+  existingNote: { marginBottom: 6 },
+  existingNoteTitle: { fontSize: 12, fontWeight: '700', color: colors.primary },
 });
