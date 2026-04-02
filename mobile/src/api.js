@@ -38,6 +38,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  healthCheck: () => request('/health', { skipAuth: true }),
   login: (body) => request('/login', { method: 'POST', body, skipAuth: true }),
   register: (body) => request('/register', { method: 'POST', body, skipAuth: true }),
 
