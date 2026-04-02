@@ -1,0 +1,92 @@
+﻿from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
+
+from app.models.chat import Chat
+from app.models.doctor_note import DoctorNote
+from app.models.medical_history import MedicalHistory
+from app.models.patient import Patient
+from app.models.user import User
+from app.schemas.doctor import DoctorNoteCreate, FlaggedConversationResponse
+from app.schemas.patient import MedicalHistoryCreate
+
+
+def _get_patient_or_404(db: Session, patient_id: int) -> Patient:
+    statement = (
+        select(Patient)
+        .options(
+            joinedload(Patient.user),
+            joinedload(Patient.chats),
+            joinedload(Patient.medical_histories),
+            joinedload(Patient.doctor_notes),
+        )
+        .where(Patient.id == patient_id)
+    )
+    patient = db.execute(statement).unique().scalar_one_or_none()
+    if patient is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found.")
+    return patient
+
+
+def list_patients(db: Session) -> list[Patient]:
+    statement = select(Patient).options(joinedload(Patient.user)).order_by(Patient.created_at.desc())
+    return list(db.scalars(statement).unique().all())
+
+
+def get_patient_details(db: Session, patient_id: int) -> Patient:
+    return _get_patient_or_404(db, patient_id)
+
+
+def list_flagged_conversations(db: Session, limit: int = 100) -> list[FlaggedConversationResponse]:
+    statement = (
+        select(Chat, Patient, User)
+        .join(Patient, Chat.patient_id == Patient.id)
+        .join(User, Patient.user_id == User.id)
+        .where(Chat.is_flagged.is_(True))
+        .order_by(Chat.created_at.desc())
+        .limit(limit)
+    )
+
+    rows = db.execute(statement).all()
+    return [
+        FlaggedConversationResponse(
+            id=chat.id,
+            patient_id=patient.id,
+            patient_name=user.name,
+            message=chat.message,
+            response=chat.response,
+            severity_level=chat.severity_level,
+            risk_reason=chat.risk_reason,
+            created_at=chat.created_at,
+        )
+        for chat, patient, user in rows
+    ]
+
+
+def add_doctor_note(db: Session, current_doctor: User, payload: DoctorNoteCreate) -> DoctorNote:
+    _get_patient_or_404(db, payload.patient_id)
+
+    note = DoctorNote(
+        doctor_id=current_doctor.id,
+        patient_id=payload.patient_id,
+        notes=payload.notes,
+        diagnosis=payload.diagnosis,
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+def add_medical_history_entry(db: Session, payload: MedicalHistoryCreate) -> MedicalHistory:
+    _get_patient_or_404(db, payload.patient_id)
+
+    entry = MedicalHistory(
+        patient_id=payload.patient_id,
+        condition=payload.condition,
+        notes=payload.notes,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry

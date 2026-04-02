@@ -1,0 +1,26 @@
+﻿from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database.session import Base
+
+
+class DoctorNote(Base):
+    __tablename__ = "doctor_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
+    notes: Mapped[str] = mapped_column(Text, nullable=False)
+    diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    doctor: Mapped["User"] = relationship(back_populates="doctor_notes")
+    patient: Mapped["Patient"] = relationship(back_populates="doctor_notes")
