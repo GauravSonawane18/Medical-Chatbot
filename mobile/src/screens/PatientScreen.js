@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -23,23 +23,118 @@ const TABS = [
 ];
 
 function formatDate(v) {
-  if (!v) return 'Unknown';
-  return new Date(v).toLocaleString();
+  if (!v) return '';
+  return new Date(v).toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
+const SEVERITY_CONFIG = {
+  critical: { bg: '#fef2f2', text: '#dc2626', border: '#fecaca', label: 'CRITICAL' },
+  high:     { bg: '#fff7ed', text: '#c2410c', border: '#fed7aa', label: 'HIGH' },
+  medium:   { bg: '#fefce8', text: '#a16207', border: '#fde68a', label: 'MEDIUM' },
+  low:      { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0', label: 'LOW' },
+};
+
 function SeverityBadge({ level, flagged }) {
-  const palette = {
-    critical: { bg: '#fef2f2', text: colors.danger },
-    high: { bg: '#fff7ed', text: '#c2410c' },
-    medium: { bg: '#fefce8', text: '#a16207' },
-    low: { bg: '#f0fdf4', text: colors.success },
-  };
-  const s = palette[level] || palette.low;
+  const s = SEVERITY_CONFIG[level] || SEVERITY_CONFIG.low;
   return (
-    <View style={[styles.badge, { backgroundColor: s.bg }]}>
+    <View style={[styles.badge, { backgroundColor: s.bg, borderColor: s.border }]}>
       <Text style={[styles.badgeText, { color: s.text }]}>
-        {level?.toUpperCase()}{flagged ? ' • Flagged' : ''}
+        {s.label}{flagged ? ' • Flagged' : ''}
       </Text>
+    </View>
+  );
+}
+
+function DoctorNoteCard({ note }) {
+  return (
+    <View style={styles.doctorNoteCard}>
+      <View style={styles.doctorNoteHeader}>
+        <Text style={styles.doctorNoteIcon}>🩺</Text>
+        <Text style={styles.doctorNoteTitle}>Doctor's Response</Text>
+        <Text style={styles.doctorNoteDate}>{formatDate(note.created_at)}</Text>
+      </View>
+
+      {note.diagnosis ? (
+        <View style={styles.noteField}>
+          <Text style={styles.noteFieldLabel}>Diagnosis</Text>
+          <Text style={styles.noteFieldValue}>{note.diagnosis}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.noteField}>
+        <Text style={styles.noteFieldLabel}>Clinical Notes</Text>
+        <Text style={styles.noteFieldValue}>{note.notes}</Text>
+      </View>
+
+      {note.recommendation ? (
+        <View style={styles.noteField}>
+          <Text style={styles.noteFieldLabel}>Recommendation</Text>
+          <Text style={styles.noteFieldValue}>{note.recommendation}</Text>
+        </View>
+      ) : null}
+
+      {note.message_to_patient ? (
+        <View style={styles.msgToPatientBox}>
+          <Text style={styles.msgToPatientLabel}>💬 Message from your doctor</Text>
+          <Text style={styles.msgToPatientText}>{note.message_to_patient}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ChatCard({ item }) {
+  const sc = SEVERITY_CONFIG[item.severity_level] || SEVERITY_CONFIG.low;
+  const hasDoctorNotes = item.doctor_notes?.length > 0;
+
+  return (
+    <View style={[styles.chatCard, { borderLeftColor: sc.text }]}>
+      {/* Header row */}
+      <View style={styles.chatCardHeader}>
+        <SeverityBadge level={item.severity_level} flagged={item.is_flagged} />
+        <Text style={styles.chatTimestamp}>{formatDate(item.created_at)}</Text>
+      </View>
+
+      {/* Reviewed tag */}
+      {item.is_reviewed && (
+        <View style={styles.reviewedTag}>
+          <Text style={styles.reviewedTagText}>✓ Reviewed by doctor {item.reviewed_at ? `· ${formatDate(item.reviewed_at)}` : ''}</Text>
+        </View>
+      )}
+
+      {/* Patient message */}
+      <View style={styles.patientMsgBox}>
+        <Text style={styles.patientMsgLabel}>You asked</Text>
+        <Text style={styles.patientMsgText}>{item.message}</Text>
+        {item.symptoms ? (
+          <Text style={styles.symptomsText}>Symptoms: {item.symptoms}</Text>
+        ) : null}
+      </View>
+
+      {/* AI response */}
+      <View style={styles.aiMsgBox}>
+        <Text style={styles.aiMsgLabel}>AI Assistant</Text>
+        <Text style={styles.aiMsgText}>{item.response}</Text>
+      </View>
+
+      {/* Risk reason — only show if flagged */}
+      {item.is_flagged && item.risk_reason ? (
+        <View style={[styles.riskBox, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+          <Text style={[styles.riskText, { color: sc.text }]}>⚑ {item.risk_reason}</Text>
+        </View>
+      ) : null}
+
+      {/* Doctor notes */}
+      {hasDoctorNotes && (
+        <View style={styles.doctorNotesSection}>
+          {item.doctor_notes.map((note) => (
+            <DoctorNoteCard key={note.id} note={note} />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -51,10 +146,10 @@ export default function PatientScreen({ user, onLogout }) {
   const [medicalHistory, setMedicalHistory] = useState([]);
   const [alert, setAlert] = useState({ message: '', type: 'error' });
   const [refreshing, setRefreshing] = useState(false);
-
   const [symptoms, setSymptoms] = useState('');
   const [message, setMessage] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
+  const scrollRef = useRef(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -71,9 +166,7 @@ export default function PatientScreen({ user, onLogout }) {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -90,7 +183,7 @@ export default function PatientScreen({ user, onLogout }) {
       setMessage('');
       setSymptoms('');
       await loadData();
-      setAlert({ message: 'Response received.', type: 'success' });
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
     } catch (e) {
       setAlert({ message: e.message, type: 'error' });
     } finally {
@@ -98,13 +191,24 @@ export default function PatientScreen({ user, onLogout }) {
     }
   }
 
+  // Count unread doctor messages
+  const unreadDoctorMessages = chatHistory.reduce((count, item) => {
+    return count + (item.doctor_notes?.filter(n => n.message_to_patient).length || 0);
+  }, 0);
+
   return (
     <View style={shared.screen}>
+      {/* Header */}
       <View style={styles.topBar}>
-        <View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.topGreeting}>Hello,</Text>
           <Text style={styles.topName}>{user.name}</Text>
-          <Text style={styles.topRole}>Patient</Text>
         </View>
+        {unreadDoctorMessages > 0 && (
+          <View style={styles.notifBadge}>
+            <Text style={styles.notifText}>💬 {unreadDoctorMessages} doctor message{unreadDoctorMessages > 1 ? 's' : ''}</Text>
+          </View>
+        )}
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
@@ -112,9 +216,10 @@ export default function PatientScreen({ user, onLogout }) {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
@@ -122,113 +227,140 @@ export default function PatientScreen({ user, onLogout }) {
         >
           <Alert message={alert.message} type={alert.type} />
 
+          {/* ── Chat Tab ── */}
           {tab === 'chat' && (
             <>
-              <Text style={shared.sectionHeader}>Ask the assistant</Text>
-              <View style={shared.card}>
-                <Text style={shared.label}>Symptoms (optional)</Text>
+              {/* Input card */}
+              <View style={styles.inputCard}>
+                <Text style={styles.inputCardTitle}>Ask the AI Assistant</Text>
+                <Text style={shared.label}>Symptoms <Text style={styles.optionalTag}>(optional)</Text></Text>
                 <TextInput
                   style={shared.input}
                   value={symptoms}
                   onChangeText={setSymptoms}
-                  placeholder="fever, cough, fatigue…"
+                  placeholder="fever, cough, chest pain…"
+                  placeholderTextColor={colors.muted}
                 />
                 <Text style={shared.label}>Describe what you're feeling</Text>
                 <TextInput
                   style={[shared.textarea, { height: 100 }]}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="I've had a headache for 3 days…"
+                  placeholder="I've had a headache for 3 days and feel dizzy…"
+                  placeholderTextColor={colors.muted}
                   multiline
                 />
                 <TouchableOpacity
-                  style={[shared.primaryBtn, chatBusy && { opacity: 0.6 }]}
+                  style={[styles.sendBtn, (!message.trim() || chatBusy) && styles.sendBtnDisabled]}
                   onPress={handleChat}
-                  disabled={chatBusy}
+                  disabled={!message.trim() || chatBusy}
                 >
-                  {chatBusy ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={shared.primaryBtnText}>Send Message</Text>
-                  )}
+                  {chatBusy
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={styles.sendBtnText}>Send Message →</Text>}
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.sectionSubheader}>Recent conversations</Text>
-              {chatHistory.length === 0 && (
-                <Text style={shared.muted}>No chats yet. Ask the assistant about your symptoms.</Text>
+              {/* Chat history */}
+              {chatHistory.length > 0 && (
+                <Text style={styles.sectionLabel}>Conversation History ({chatHistory.length})</Text>
+              )}
+              {chatHistory.length === 0 && !chatBusy && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>💬</Text>
+                  <Text style={styles.emptyTitle}>No conversations yet</Text>
+                  <Text style={styles.emptyDesc}>Describe your symptoms above and the AI will respond.</Text>
+                </View>
               )}
               {chatHistory.map((item) => (
-                <View key={item.id} style={shared.card}>
-                  <View style={styles.chatHeader}>
-                    <SeverityBadge level={item.severity_level} flagged={item.is_flagged} />
-                    <Text style={shared.muted}>{formatDate(item.created_at)}</Text>
-                  </View>
-                  <Text style={styles.chatMessage}>{item.message}</Text>
-                  {item.symptoms ? (
-                    <Text style={shared.muted}>Symptoms: {item.symptoms}</Text>
-                  ) : null}
-                  <View style={shared.divider} />
-                  <Text style={styles.chatResponse}>{item.response}</Text>
-
-                  {item.doctor_notes?.length > 0 && (
-                    <View style={styles.doctorRepliesBox}>
-                      <Text style={styles.doctorRepliesLabel}>Doctor replies</Text>
-                      {item.doctor_notes.map((note) => (
-                        <View key={note.id} style={styles.doctorReply}>
-                          <Text style={styles.doctorReplyTitle}>
-                            {note.diagnosis ? `Diagnosis: ${note.diagnosis}` : 'Doctor note'}
-                          </Text>
-                          <Text style={styles.doctorReplyText}>{note.notes}</Text>
-                          <Text style={shared.muted}>{formatDate(note.created_at)}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                <ChatCard key={item.id} item={item} />
               ))}
             </>
           )}
 
+          {/* ── History Tab ── */}
           {tab === 'history' && (
             <>
-              <Text style={shared.sectionHeader}>Medical History</Text>
+              <Text style={styles.sectionLabel}>Medical History</Text>
               {medicalHistory.length === 0 && (
-                <Text style={shared.muted}>No medical history entries yet.</Text>
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📋</Text>
+                  <Text style={styles.emptyTitle}>No records yet</Text>
+                  <Text style={styles.emptyDesc}>Medical history added by your doctor will appear here.</Text>
+                </View>
               )}
               {medicalHistory.map((item) => (
-                <View key={item.id} style={shared.card}>
-                  <Text style={shared.cardTitle}>{item.condition}</Text>
-                  <Text style={shared.muted}>{item.notes || 'No notes provided.'}</Text>
-                  <Text style={[shared.muted, { marginTop: 6 }]}>{formatDate(item.created_at)}</Text>
+                <View key={item.id} style={styles.historyCard}>
+                  <View style={styles.historyCardLeft} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyCondition}>{item.condition}</Text>
+                    {item.notes ? <Text style={styles.historyNotes}>{item.notes}</Text> : null}
+                    <Text style={styles.historyDate}>{formatDate(item.created_at)}</Text>
+                  </View>
                 </View>
               ))}
             </>
           )}
 
+          {/* ── Profile Tab ── */}
           {tab === 'profile' && (
             <>
-              <Text style={shared.sectionHeader}>Your Profile</Text>
-              {profile ? (
-                <View style={shared.card}>
-                  {[
-                    ['Name', profile.user?.name],
-                    ['Email', profile.user?.email],
-                    ['Age', profile.age],
-                    ['Gender', profile.gender],
-                    ['Blood Group', profile.blood_group],
-                    ['Weight', profile.weight ? `${profile.weight} ${profile.weight_unit || ''}` : null],
-                    ['Phone', profile.phone_number],
-                    ['Allergies', profile.allergies],
-                  ].map(([label, val]) => (
-                    <View key={label} style={styles.metaRow}>
-                      <Text style={styles.metaLabel}>{label}</Text>
-                      <Text style={styles.metaValue}>{val || 'Not provided'}</Text>
-                    </View>
-                  ))}
-                </View>
+              <Text style={styles.sectionLabel}>Your Profile</Text>
+              {!profile ? (
+                <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
               ) : (
-                <ActivityIndicator color={colors.primary} />
+                <>
+                  {/* Avatar card */}
+                  <View style={styles.avatarCard}>
+                    <View style={styles.avatarCircle}>
+                      <Text style={styles.avatarInitial}>
+                        {(profile.user?.name || user.name || '?')[0].toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.avatarName}>{profile.user?.name || user.name}</Text>
+                    <Text style={styles.avatarEmail}>{profile.user?.email || user.email}</Text>
+                  </View>
+
+                  {/* Info grid */}
+                  <View style={styles.infoGrid}>
+                    {[
+                      { label: 'Age', value: profile.age ? `${profile.age} yrs` : null, icon: '🎂' },
+                      { label: 'Gender', value: profile.gender, icon: '👤' },
+                      { label: 'Blood Group', value: profile.blood_group, icon: '🩸' },
+                      { label: 'Weight', value: profile.weight ? `${profile.weight} ${profile.weight_unit || ''}` : null, icon: '⚖️' },
+                      { label: 'Phone', value: profile.phone_number, icon: '📞' },
+                      { label: 'Allergies', value: profile.allergies, icon: '⚠️' },
+                    ].map(({ label, value, icon }) =>
+                      value ? (
+                        <View key={label} style={styles.infoTile}>
+                          <Text style={styles.infoTileIcon}>{icon}</Text>
+                          <Text style={styles.infoTileValue}>{value}</Text>
+                          <Text style={styles.infoTileLabel}>{label}</Text>
+                        </View>
+                      ) : null
+                    )}
+                  </View>
+
+                  {/* Stats */}
+                  <View style={styles.statsRow}>
+                    <View style={styles.statBox}>
+                      <Text style={styles.statNum}>{chatHistory.length}</Text>
+                      <Text style={styles.statLbl}>Chats</Text>
+                    </View>
+                    <View style={[styles.statBox, styles.statBoxMiddle]}>
+                      <Text style={[styles.statNum, { color: '#c2410c' }]}>
+                        {chatHistory.filter(c => c.is_flagged).length}
+                      </Text>
+                      <Text style={styles.statLbl}>Flagged</Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text style={[styles.statNum, { color: colors.success }]}>
+                        {medicalHistory.length}
+                      </Text>
+                      <Text style={styles.statLbl}>Records</Text>
+                    </View>
+                  </View>
+                </>
               )}
             </>
           )}
@@ -241,37 +373,277 @@ export default function PatientScreen({ user, onLogout }) {
 }
 
 const styles = StyleSheet.create({
+  // Header
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 52,
     paddingBottom: 16,
+    gap: 10,
   },
+  topGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
   topName: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  topRole: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   logoutBtn: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   logoutText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  scroll: { padding: 16, paddingBottom: 32 },
-  sectionSubheader: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10, marginTop: 8 },
-  badge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 8 },
+  notifBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  notifText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+
+  scroll: { padding: 16, paddingBottom: 40 },
+  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 12, marginTop: 4 },
+
+  // Input card
+  inputCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inputCardTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 14 },
+  optionalTag: { fontSize: 12, color: colors.muted, fontWeight: '400' },
+  sendBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sendBtnDisabled: { opacity: 0.5 },
+  sendBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  // Severity badge
+  badge: {
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   badgeText: { fontSize: 11, fontWeight: '700' },
-  chatMessage: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 4 },
-  chatResponse: { fontSize: 14, color: colors.label, lineHeight: 20 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
-  metaLabel: { fontSize: 13, color: colors.muted, flex: 1 },
-  metaValue: { fontSize: 13, color: colors.text, fontWeight: '600', flex: 2, textAlign: 'right' },
-  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  doctorRepliesBox: { marginTop: 12, backgroundColor: '#eff6ff', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
-  doctorRepliesLabel: { fontSize: 11, fontWeight: '700', color: colors.primary, textTransform: 'uppercase', marginBottom: 8 },
-  doctorReply: { marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#bfdbfe' },
-  doctorReplyTitle: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 2 },
-  doctorReplyText: { fontSize: 13, color: colors.label, lineHeight: 18 },
+
+  // Chat card
+  chatCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  chatCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  chatTimestamp: { fontSize: 11, color: colors.muted },
+
+  reviewedTag: {
+    backgroundColor: '#dcfce7',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  reviewedTagText: { fontSize: 11, color: '#16a34a', fontWeight: '600' },
+
+  patientMsgBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  patientMsgLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  patientMsgText: { fontSize: 14, color: colors.text, fontWeight: '500', lineHeight: 20 },
+  symptomsText: { fontSize: 12, color: colors.muted, marginTop: 4 },
+
+  aiMsgBox: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  aiMsgLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  aiMsgText: { fontSize: 13, color: colors.label, lineHeight: 19 },
+
+  riskBox: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 8,
+    marginBottom: 8,
+  },
+  riskText: { fontSize: 12, fontWeight: '600' },
+
+  // Doctor notes section
+  doctorNotesSection: { marginTop: 4 },
+  doctorNoteCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  doctorNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 6,
+  },
+  doctorNoteIcon: { fontSize: 16 },
+  doctorNoteTitle: { fontSize: 13, fontWeight: '700', color: '#15803d', flex: 1 },
+  doctorNoteDate: { fontSize: 11, color: colors.muted },
+  noteField: {
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#bbf7d0',
+  },
+  noteFieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#15803d',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  noteFieldValue: { fontSize: 13, color: colors.text, lineHeight: 18 },
+
+  msgToPatientBox: {
+    backgroundColor: '#dbeafe',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+  },
+  msgToPatientLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  msgToPatientText: { fontSize: 14, color: colors.text, lineHeight: 20, fontWeight: '500' },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+  },
+  emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
+  emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 18 },
+
+  // History tab
+  historyCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyCardLeft: { width: 4, backgroundColor: colors.primary },
+  historyCondition: { fontSize: 14, fontWeight: '700', color: colors.text, padding: 12, paddingBottom: 4 },
+  historyNotes: { fontSize: 13, color: colors.label, paddingHorizontal: 12, lineHeight: 18 },
+  historyDate: { fontSize: 11, color: colors.muted, padding: 12, paddingTop: 6 },
+
+  // Profile tab
+  avatarCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  avatarCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatarInitial: { fontSize: 30, fontWeight: '800', color: '#fff' },
+  avatarName: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 4 },
+  avatarEmail: { fontSize: 13, color: colors.muted },
+
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  infoTile: {
+    width: '47%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoTileIcon: { fontSize: 20, marginBottom: 6 },
+  infoTileValue: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  infoTileLabel: { fontSize: 11, color: colors.muted, textTransform: 'uppercase' },
+
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 8,
+  },
+  statBox: { flex: 1, alignItems: 'center', paddingVertical: 16 },
+  statBoxMiddle: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
+  statNum: { fontSize: 22, fontWeight: '800', color: colors.primary },
+  statLbl: { fontSize: 11, color: colors.muted, marginTop: 2, textTransform: 'uppercase' },
 });
