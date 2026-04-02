@@ -85,7 +85,9 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
   }
 
   async function saveNote() {
-    if (!noteForm.notes.trim() || !noteForm.selectedChatId) return;
+    if (!noteForm.selectedChatId) return;
+    const hasContent = noteForm.notes.trim() || noteForm.diagnosis.trim() || noteForm.recommendation.trim() || noteForm.message_to_patient.trim();
+    if (!hasContent) return;
     setBusy(true);
     setAlert({ message: '' });
     try {
@@ -307,7 +309,7 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
                 <View style={styles.replyForm}>
                   <Text style={styles.replyFormTitle}>Doctor's Response to this Chat</Text>
 
-                  <Text style={shared.label}>Clinical Notes *</Text>
+                  <Text style={shared.label}>Clinical Notes</Text>
                   <TextInput style={[shared.textarea, { height: 80 }]} value={noteForm.notes} onChangeText={(v) => setNoteForm((f) => ({ ...f, notes: v }))} placeholder="Observations, concerns, follow-up actions…" multiline />
 
                   <Text style={shared.label}>Diagnosis</Text>

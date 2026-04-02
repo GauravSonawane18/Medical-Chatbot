@@ -7,7 +7,7 @@ from app.models.enums import SeverityLevel
 
 class DoctorNoteCreate(BaseModel):
     chat_id: int
-    notes: str = Field(min_length=2, max_length=4000)
+    notes: str = Field(default="", max_length=4000)
     diagnosis: str | None = Field(default=None, max_length=2000)
     recommendation: str | None = Field(default=None, max_length=2000)
     message_to_patient: str | None = Field(default=None, max_length=2000)
