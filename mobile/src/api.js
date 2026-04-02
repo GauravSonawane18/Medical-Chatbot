@@ -60,6 +60,7 @@ export const api = {
   getPatient: (id) => request(`/patients/${id}`),
   getFlaggedChats: () => request('/doctor/flagged-chats'),
   getNotifications: () => request('/doctor/notifications'),
+  reviewChat: (chatId) => request(`/doctor/chats/${chatId}/review`, { method: 'POST' }),
   addDoctorNote: (body) => request('/doctor/notes', { method: 'POST', body }),
   addMedicalHistory: (body) => request('/doctor/medical-history', { method: 'POST', body }),
 };

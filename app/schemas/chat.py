@@ -17,6 +17,8 @@ class ChatDoctorNote(BaseModel):
     doctor_id: int
     notes: str
     diagnosis: str | None
+    recommendation: str | None
+    message_to_patient: str | None
     created_at: datetime
 
 
@@ -29,6 +31,8 @@ class ChatHistoryItem(BaseModel):
     response: str
     severity_level: SeverityLevel
     is_flagged: bool
+    is_reviewed: bool
+    reviewed_at: datetime | None
     risk_reason: str | None
     created_at: datetime
     doctor_notes: list[ChatDoctorNote] = []
@@ -39,5 +43,6 @@ class ChatResponse(BaseModel):
     response: str
     severity_level: SeverityLevel
     is_flagged: bool
+    is_reviewed: bool = False
     risk_reason: str | None
     created_at: datetime

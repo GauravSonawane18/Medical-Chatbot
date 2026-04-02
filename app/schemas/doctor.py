@@ -9,6 +9,8 @@ class DoctorNoteCreate(BaseModel):
     chat_id: int
     notes: str = Field(min_length=2, max_length=4000)
     diagnosis: str | None = Field(default=None, max_length=2000)
+    recommendation: str | None = Field(default=None, max_length=2000)
+    message_to_patient: str | None = Field(default=None, max_length=2000)
 
 
 class DoctorNoteResponse(BaseModel):
@@ -20,6 +22,8 @@ class DoctorNoteResponse(BaseModel):
     chat_id: int | None
     notes: str
     diagnosis: str | None
+    recommendation: str | None
+    message_to_patient: str | None
     created_at: datetime
 
 
@@ -30,5 +34,12 @@ class FlaggedConversationResponse(BaseModel):
     message: str
     response: str
     severity_level: SeverityLevel
+    is_reviewed: bool
     risk_reason: str | None
     created_at: datetime
+
+
+class ReviewResponse(BaseModel):
+    id: int
+    is_reviewed: bool
+    reviewed_at: datetime | None

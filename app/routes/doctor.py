@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.enums import UserRole
 from app.models.user import User
-from app.schemas.doctor import DoctorNoteCreate, DoctorNoteResponse, FlaggedConversationResponse
+from app.schemas.doctor import DoctorNoteCreate, DoctorNoteResponse, FlaggedConversationResponse, ReviewResponse
 from app.schemas.patient import MedicalHistoryCreate, MedicalHistoryResponse, PatientDetailResponse, PatientSummaryResponse
 from app.services.doctor_service import (
     add_doctor_note,
@@ -12,6 +12,7 @@ from app.services.doctor_service import (
     get_patient_details,
     list_flagged_conversations,
     list_patients,
+    mark_chat_reviewed,
 )
 from app.utils.dependencies import require_roles
 
@@ -50,6 +51,16 @@ def get_flagged_chats(
     db: Session = Depends(get_db),
 ) -> list[FlaggedConversationResponse]:
     return list_flagged_conversations(db)
+
+
+@router.post("/doctor/chats/{chat_id}/review", response_model=ReviewResponse)
+def review_chat(
+    chat_id: int,
+    _: User = Depends(require_roles(UserRole.doctor, UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> ReviewResponse:
+    chat = mark_chat_reviewed(db, chat_id)
+    return ReviewResponse(id=chat.id, is_reviewed=chat.is_reviewed, reviewed_at=chat.reviewed_at)
 
 
 @router.post("/doctor/notes", response_model=DoctorNoteResponse, status_code=status.HTTP_201_CREATED)

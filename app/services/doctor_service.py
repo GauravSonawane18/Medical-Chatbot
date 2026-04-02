@@ -56,6 +56,7 @@ def list_flagged_conversations(db: Session, limit: int = 100) -> list[FlaggedCon
             message=chat.message,
             response=chat.response,
             severity_level=chat.severity_level,
+            is_reviewed=chat.is_reviewed,
             risk_reason=chat.risk_reason,
             created_at=chat.created_at,
         )
@@ -74,11 +75,25 @@ def add_doctor_note(db: Session, current_doctor: User, payload: DoctorNoteCreate
         chat_id=chat.id,
         notes=payload.notes,
         diagnosis=payload.diagnosis,
+        recommendation=payload.recommendation,
+        message_to_patient=payload.message_to_patient,
     )
     db.add(note)
     db.commit()
     db.refresh(note)
     return note
+
+
+def mark_chat_reviewed(db: Session, chat_id: int) -> Chat:
+    from datetime import datetime, timezone
+    chat = db.scalar(select(Chat).where(Chat.id == chat_id))
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
+    chat.is_reviewed = True
+    chat.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(chat)
+    return chat
 
 
 def add_medical_history_entry(db: Session, payload: MedicalHistoryCreate) -> MedicalHistory:
