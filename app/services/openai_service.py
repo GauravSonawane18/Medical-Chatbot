@@ -11,7 +11,10 @@ settings = get_settings()
 
 
 def generate_with_openai(prompt: str) -> str:
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = OpenAI(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url or None,
+    )
     started_at = perf_counter()
 
     try:
