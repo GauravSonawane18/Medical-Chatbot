@@ -7,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config.settings import get_settings
 from app.database.base import Base
-from app.database.session import engine
+from app.database.migrations import run_migrations
+from app.database.session import SessionLocal, engine
 from app.routes.auth import router as auth_router
 from app.routes.doctor import router as doctor_router
 from app.routes.patient import router as patient_router
@@ -27,6 +28,8 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        run_migrations(db)
     yield
 
 

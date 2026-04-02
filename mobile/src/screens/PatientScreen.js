@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -42,6 +42,8 @@ const SEVERITY_CONFIG = {
 };
 
 function SeverityBadge({ level, flagged }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const s = SEVERITY_CONFIG[level] || SEVERITY_CONFIG.low;
   return (
     <View style={[styles.badge, { backgroundColor: s.bg, borderColor: s.border }]}>
@@ -54,6 +56,7 @@ function SeverityBadge({ level, flagged }) {
 
 function DoctorNoteCard({ note, onReload }) {
   const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [replyText, setReplyText] = useState('');
   const [showReply, setShowReply] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -162,6 +165,7 @@ function DoctorNoteCard({ note, onReload }) {
 
 function ChatCard({ item, onReload }) {
   const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const sc = SEVERITY_CONFIG[item.severity_level] || SEVERITY_CONFIG.low;
   const hasDoctorNotes = item.doctor_notes?.length > 0;
 
@@ -197,7 +201,7 @@ function ChatCard({ item, onReload }) {
       </View>
 
       {/* AI response */}
-      <View style={[styles.aiMsgBox, { backgroundColor: colors.dark ? '#1e3a5f' : '#eff6ff' }]}>
+      <View style={styles.aiMsgBox}>
         <Text style={[styles.aiMsgLabel, { color: colors.primary }]}>AI Assistant</Text>
         {item.response === null
           ? <View style={styles.typingRow}>
@@ -228,6 +232,7 @@ function ChatCard({ item, onReload }) {
 
 export default function PatientScreen({ user, onLogout }) {
   const { colors, shared, dark, toggle: toggleTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   usePushNotifications(false);
   const [tab, setTab] = useState('chat');
   const [profile, setProfile] = useState(null);
@@ -666,7 +671,9 @@ export default function PatientScreen({ user, onLogout }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  const dark = colors.bg === '#0f172a';
+  return StyleSheet.create({
   // Header
   topBar: {
     flexDirection: 'row',
@@ -805,7 +812,7 @@ const styles = StyleSheet.create({
   symptomsText: { fontSize: 12, color: colors.muted, marginTop: 4 },
 
   aiMsgBox: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: dark ? '#1e3a5f' : '#eff6ff',
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
@@ -833,12 +840,12 @@ const styles = StyleSheet.create({
   // Doctor notes section
   doctorNotesSection: { marginTop: 4 },
   doctorNoteCard: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: dark ? '#14532d' : '#f0fdf4',
     borderRadius: 10,
     padding: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: dark ? '#166534' : '#bbf7d0',
   },
   doctorNoteHeader: {
     flexDirection: 'row',
@@ -847,18 +854,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   doctorNoteIcon: { fontSize: 16 },
-  doctorNoteTitle: { fontSize: 13, fontWeight: '700', color: '#15803d', flex: 1 },
+  doctorNoteTitle: { fontSize: 13, fontWeight: '700', color: dark ? '#86efac' : '#15803d', flex: 1 },
   doctorNoteDate: { fontSize: 11, color: colors.muted },
   noteField: {
     marginBottom: 8,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#bbf7d0',
+    borderBottomColor: dark ? '#166534' : '#bbf7d0',
   },
   noteFieldLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#15803d',
+    color: dark ? '#86efac' : '#15803d',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 3,
@@ -866,17 +873,17 @@ const styles = StyleSheet.create({
   noteFieldValue: { fontSize: 13, color: colors.text, lineHeight: 18 },
 
   msgToPatientBox: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: dark ? '#1e3a5f' : '#dbeafe',
     borderRadius: 8,
     padding: 10,
     marginTop: 4,
     borderWidth: 1,
-    borderColor: '#93c5fd',
+    borderColor: dark ? '#1d4ed8' : '#93c5fd',
   },
   msgToPatientLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.primary,
+    color: dark ? '#93c5fd' : colors.primary,
     marginBottom: 4,
   },
   msgToPatientText: { fontSize: 14, color: colors.text, lineHeight: 20, fontWeight: '500' },
@@ -885,29 +892,29 @@ const styles = StyleSheet.create({
   replyTriggerBtn: {
     marginTop: 10,
     alignSelf: 'flex-start',
-    backgroundColor: '#eff6ff',
+    backgroundColor: dark ? '#1e3a5f' : '#eff6ff',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: dark ? '#1d4ed8' : '#bfdbfe',
   },
   replyTriggerText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
   patientReplyBox: {
     marginTop: 10,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: dark ? '#0c2340' : '#f0f9ff',
     borderRadius: 8,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#bae6fd',
+    borderColor: dark ? '#075985' : '#bae6fd',
   },
-  patientReplyLabel: { fontSize: 10, fontWeight: '700', color: '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
+  patientReplyLabel: { fontSize: 10, fontWeight: '700', color: dark ? '#7dd3fc' : '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
   patientReplyText: { fontSize: 13, color: colors.text, lineHeight: 18 },
   editReplyBtn: { marginTop: 6, alignSelf: 'flex-start' },
   editReplyBtnText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
   replyInputBox: {
     marginTop: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: dark ? '#1e293b' : '#f8fafc',
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
@@ -915,14 +922,14 @@ const styles = StyleSheet.create({
   },
   replyInput: {
     borderWidth: 1,
-    borderColor: '#93c5fd',
+    borderColor: dark ? '#1d4ed8' : '#93c5fd',
     borderRadius: 8,
     padding: 10,
     fontSize: 14,
     color: colors.text,
     minHeight: 80,
     textAlignVertical: 'top',
-    backgroundColor: '#fff',
+    backgroundColor: dark ? '#0f172a' : '#fff',
     marginBottom: 8,
   },
   replyActions: { flexDirection: 'row', gap: 8 },
@@ -958,7 +965,7 @@ const styles = StyleSheet.create({
   // History tab
   historyCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     marginBottom: 10,
     overflow: 'hidden',
@@ -975,7 +982,7 @@ const styles = StyleSheet.create({
 
   // Profile tab
   avatarCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: 24,
     alignItems: 'center',
@@ -1007,7 +1014,7 @@ const styles = StyleSheet.create({
   },
   infoTile: {
     width: '47%',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 14,
     alignItems: 'flex-start',
@@ -1020,7 +1027,7 @@ const styles = StyleSheet.create({
 
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1068,4 +1075,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
-});
+  });
+}

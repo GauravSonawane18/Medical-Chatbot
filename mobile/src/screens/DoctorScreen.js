@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,7 +17,7 @@ import { api } from '../api';
 import { useWebSocket } from '../useWebSocket';
 import { useTheme } from '../ThemeContext';
 import { usePushNotifications } from '../usePushNotifications';
-import { colors as staticColors, shared as staticShared } from '../theme';
+import { shared as staticShared } from '../theme';
 
 function buildTabs(unreviewedCount) {
   return [
@@ -43,6 +43,8 @@ const SEVERITY_CONFIG = {
 };
 
 function SeverityBadge({ level }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const s = SEVERITY_CONFIG[level] || SEVERITY_CONFIG.low;
   return (
     <View style={[styles.badge, { backgroundColor: s.bg, borderColor: s.border }]}>
@@ -52,6 +54,8 @@ function SeverityBadge({ level }) {
 }
 
 function ReviewedTag({ isReviewed, reviewedAt }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   if (!isReviewed) return null;
   return (
     <View style={styles.reviewedTag}>
@@ -62,6 +66,7 @@ function ReviewedTag({ isReviewed, reviewedAt }) {
 
 function StatCard({ label, value, color }) {
   const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.statCard, { borderTopColor: color, backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
@@ -73,6 +78,7 @@ function StatCard({ label, value, color }) {
 // ─── Patient Detail ────────────────────────────────────────────────────────────
 function PatientDetail({ patient, onBack, onSaved, doctorId }) {
   const { colors, shared } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [noteForm, setNoteForm] = useState({
     selectedChatId: null,
     notes: '',
@@ -350,6 +356,7 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
 // ─── Main Doctor Screen ────────────────────────────────────────────────────────
 export default function DoctorScreen({ user, onLogout }) {
   const { colors, shared, dark, toggle: toggleTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   usePushNotifications(true);
   const [tab, setTab] = useState('dashboard');
   const [patients, setPatients] = useState([]);
@@ -594,7 +601,9 @@ export default function DoctorScreen({ user, onLogout }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  const dark = colors.bg === '#0f172a';
+  return StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 16, gap: 8 },
   themeBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
   topName: { fontSize: 17, fontWeight: '700', color: '#fff' },
@@ -603,7 +612,7 @@ const styles = StyleSheet.create({
   logoutText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   scroll: { padding: 16, paddingBottom: 32 },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 10, alignItems: 'center', borderTopWidth: 3, borderWidth: 1, borderColor: colors.border },
+  statCard: { flex: 1, backgroundColor: colors.card, borderRadius: 10, padding: 10, alignItems: 'center', borderTopWidth: 3, borderWidth: 1, borderColor: colors.border },
   statValue: { fontSize: 22, fontWeight: '800' },
   statLabel: { fontSize: 10, color: colors.muted, marginTop: 2, textAlign: 'center' },
   priorityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -616,7 +625,7 @@ const styles = StyleSheet.create({
   riskBox: { borderRadius: 6, padding: 8, marginTop: 6 },
   riskText: { fontSize: 12, fontWeight: '600' },
   tapHint: { fontSize: 12, color: colors.primary, marginTop: 8, fontWeight: '500' },
-  allClearBox: { alignItems: 'center', paddingVertical: 32, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginBottom: 12 },
+  allClearBox: { alignItems: 'center', paddingVertical: 32, backgroundColor: dark ? '#14532d' : '#f0fdf4', borderRadius: 12, borderWidth: 1, borderColor: dark ? '#166534' : '#bbf7d0', marginBottom: 12 },
   allClearIcon: { fontSize: 32, color: colors.success, marginBottom: 8 },
   allClearText: { fontSize: 15, fontWeight: '600', color: colors.success },
   patientRow: { flexDirection: 'row', alignItems: 'center' },
@@ -636,35 +645,36 @@ const styles = StyleSheet.create({
   infoItem: { minWidth: '45%' },
   infoLabel: { fontSize: 11, color: colors.muted, textTransform: 'uppercase' },
   infoValue: { fontSize: 14, fontWeight: '600', color: colors.text },
-  alertBanner: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' },
+  alertBanner: { backgroundColor: dark ? '#450a0a' : '#fef2f2', borderRadius: 8, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: dark ? '#7f1d1d' : '#fecaca' },
   alertBannerText: { color: colors.danger, fontWeight: '600', fontSize: 13 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10, marginTop: 6 },
-  messageBox: { backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 8 },
+  messageBox: { backgroundColor: dark ? '#1e293b' : '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 8 },
   messageLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', marginBottom: 4 },
   messageText: { fontSize: 14, color: colors.text, fontWeight: '500' },
-  aiBox: { backgroundColor: '#eff6ff', borderRadius: 8, padding: 10, marginBottom: 8 },
+  aiBox: { backgroundColor: dark ? '#1e3a5f' : '#eff6ff', borderRadius: 8, padding: 10, marginBottom: 8 },
   aiLabel: { fontSize: 11, fontWeight: '700', color: colors.primary, textTransform: 'uppercase', marginBottom: 4 },
   aiText: { fontSize: 13, color: colors.label, lineHeight: 18 },
-  existingNotes: { backgroundColor: '#f0fdf4', borderRadius: 8, padding: 10, marginTop: 6 },
-  existingNotesLabel: { fontSize: 11, fontWeight: '700', color: colors.success, textTransform: 'uppercase', marginBottom: 8 },
-  existingNote: { marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#bbf7d0' },
+  existingNotes: { backgroundColor: dark ? '#14532d' : '#f0fdf4', borderRadius: 8, padding: 10, marginTop: 6 },
+  existingNotesLabel: { fontSize: 11, fontWeight: '700', color: dark ? '#86efac' : colors.success, textTransform: 'uppercase', marginBottom: 8 },
+  existingNote: { marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: dark ? '#166534' : '#bbf7d0' },
   noteFieldLabel: { fontSize: 12, color: colors.muted, fontWeight: '600' },
   noteFieldValue: { fontWeight: '400', color: colors.text },
-  msgToPatient: { backgroundColor: '#dbeafe', borderRadius: 6, padding: 8, marginTop: 6 },
-  msgToPatientLabel: { fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 2 },
+  msgToPatient: { backgroundColor: dark ? '#1e3a5f' : '#dbeafe', borderRadius: 6, padding: 8, marginTop: 6 },
+  msgToPatientLabel: { fontSize: 11, fontWeight: '700', color: dark ? '#93c5fd' : colors.primary, marginBottom: 2 },
   msgToPatientText: { fontSize: 13, color: colors.text },
-  reviewedTag: { backgroundColor: '#dcfce7', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: 8 },
-  reviewedTagText: { fontSize: 12, color: colors.success, fontWeight: '600' },
+  reviewedTag: { backgroundColor: dark ? '#14532d' : '#dcfce7', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: 8 },
+  reviewedTagText: { fontSize: 12, color: dark ? '#86efac' : colors.success, fontWeight: '600' },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   reviewBtn: { flex: 1, borderRadius: 8, borderWidth: 1, borderColor: colors.success, paddingVertical: 10, alignItems: 'center' },
   reviewBtnText: { color: colors.success, fontWeight: '700', fontSize: 13 },
   replyBtn: { flex: 1, borderRadius: 8, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10, alignItems: 'center' },
   replyBtnActive: { backgroundColor: colors.primary },
   replyBtnText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
-  replyForm: { marginTop: 12, backgroundColor: '#f8fafc', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border },
+  replyForm: { marginTop: 12, backgroundColor: dark ? '#1e293b' : '#f8fafc', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border },
   replyFormTitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 },
   msgLabel: { color: colors.primary },
-  patientReplyBox: { marginTop: 8, backgroundColor: '#f0f9ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#bae6fd' },
-  patientReplyLabel: { fontSize: 10, fontWeight: '700', color: '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
+  patientReplyBox: { marginTop: 8, backgroundColor: dark ? '#0c2340' : '#f0f9ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: dark ? '#075985' : '#bae6fd' },
+  patientReplyLabel: { fontSize: 10, fontWeight: '700', color: dark ? '#7dd3fc' : '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
   patientReplyText: { fontSize: 13, color: colors.text, lineHeight: 18 },
-});
+  });
+}
