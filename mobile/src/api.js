@@ -27,11 +27,20 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    const msg =
-      typeof data === 'object' && data !== null
-        ? data.detail || JSON.stringify(data)
-        : data;
-    throw new Error(msg || 'Request failed.');
+    let msg = 'Request failed.';
+    if (typeof data === 'string' && data) {
+      msg = data;
+    } else if (data?.detail) {
+      if (Array.isArray(data.detail)) {
+        // FastAPI validation errors: [{loc, msg, type}]
+        msg = data.detail.map((e) => e.msg || JSON.stringify(e)).join(', ');
+      } else {
+        msg = String(data.detail);
+      }
+    } else if (data) {
+      msg = JSON.stringify(data);
+    }
+    throw new Error(msg);
   }
 
   return data;
