@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { StatusBar } from 'expo-status-bar';
 
 import { clearSession, loadSession } from './src/storage';
-import { api } from './src/api';
+import { api, setUnauthorizedHandler } from './src/api';
 import AuthScreen from './src/screens/AuthScreen';
 import PatientScreen from './src/screens/PatientScreen';
 import DoctorScreen from './src/screens/DoctorScreen';
@@ -106,6 +106,10 @@ export default function App() {
     setToken(null);
     setUser(null);
   }
+
+  useEffect(() => {
+    setUnauthorizedHandler(handleLogout);
+  }, []);
 
   if (loading) {
     return (

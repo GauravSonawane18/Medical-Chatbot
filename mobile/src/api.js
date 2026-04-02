@@ -4,6 +4,12 @@ import { getToken } from './storage';
 // Android emulator only: use 10.0.2.2
 export const API_BASE_URL = 'http://10.187.101.163:8000';
 
+// App.js registers this so any 401 auto-triggers logout
+let _onUnauthorized = null;
+export function setUnauthorizedHandler(fn) {
+  _onUnauthorized = fn;
+}
+
 async function request(path, options = {}) {
   const token = options.skipAuth ? null : await getToken();
 
@@ -19,6 +25,11 @@ async function request(path, options = {}) {
     });
   } catch {
     throw new Error('Cannot reach the server. Check that FastAPI is running and the IP is correct.');
+  }
+
+  if (response.status === 401 && !options.skipAuth) {
+    _onUnauthorized?.();
+    throw new Error('Session expired. Please log in again.');
   }
 
   const contentType = response.headers.get('content-type') || '';

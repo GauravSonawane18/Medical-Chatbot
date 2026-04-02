@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(
-        default=60,
+        default=10080,  # 7 days
         validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES",
     )
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
