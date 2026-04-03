@@ -13,6 +13,7 @@ class Patient(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    patient_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
     age: Mapped[int | None] = mapped_column(nullable=True)
     gender: Mapped[str | None] = mapped_column(String(50), nullable=True)
     phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True)

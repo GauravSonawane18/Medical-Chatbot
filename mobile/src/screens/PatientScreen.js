@@ -628,6 +628,11 @@ export default function PatientScreen({ user, onLogout }) {
                       </Text>
                     </View>
                     <Text style={[styles.avatarName, { color: colors.text }]}>{profile.user?.name || user.name}</Text>
+                    {profile.patient_code && (
+                      <View style={[styles.patientCodeBadge, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.patientCodeText}>{profile.patient_code}</Text>
+                      </View>
+                    )}
                     <Text style={[styles.avatarEmail, { color: colors.muted }]}>{profile.user?.email || user.email}</Text>
                   </View>
 
@@ -1016,7 +1021,9 @@ function makeStyles(colors) {
     marginBottom: 12,
   },
   avatarInitial: { fontSize: 30, fontWeight: '800', color: '#fff' },
-  avatarName: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 4 },
+  avatarName: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 6 },
+  patientCodeBadge: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, marginBottom: 6 },
+  patientCodeText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
   avatarEmail: { fontSize: 13, color: colors.muted },
 
   infoGrid: {

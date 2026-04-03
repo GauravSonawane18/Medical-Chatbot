@@ -54,6 +54,7 @@ def list_flagged_conversations(db: Session, limit: int = 100) -> list[FlaggedCon
             id=chat.id,
             patient_id=patient.id,
             patient_name=user.name,
+            patient_code=patient.patient_code,
             message=chat.message,
             response=chat.response,
             severity_level=chat.severity_level,

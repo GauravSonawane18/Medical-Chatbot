@@ -173,7 +173,14 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.detailTitle}>{patient.user?.name}</Text>
-          <Text style={styles.detailSub}>{patient.user?.email}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+            {patient.patient_code && (
+              <View style={styles.detailCodeBadge}>
+                <Text style={styles.detailCodeText}>{patient.patient_code}</Text>
+              </View>
+            )}
+            <Text style={styles.detailSub}>{patient.user?.email}</Text>
+          </View>
         </View>
         {(criticalCount > 0 || highCount > 0) && (
           <View style={styles.urgentBadge}>
@@ -549,7 +556,10 @@ export default function DoctorScreen({ user, onLogout }) {
                             <View style={[styles.patientAvatar, { backgroundColor: sc.text }]}>
                               <Text style={styles.patientAvatarText}>{(chat.patient_name || '?')[0].toUpperCase()}</Text>
                             </View>
-                            <Text style={styles.patientName}>{chat.patient_name}</Text>
+                            <View>
+                              <Text style={styles.patientName}>{chat.patient_name}</Text>
+                              {chat.patient_code && <Text style={styles.patientCodeTag}>{chat.patient_code}</Text>}
+                            </View>
                           </View>
                           <Text style={styles.chatPreview} numberOfLines={2}>{chat.message}</Text>
                           {chat.risk_reason && (
@@ -606,7 +616,7 @@ export default function DoctorScreen({ user, onLogout }) {
                       <Text style={styles.patientInitialText}>{initials}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <Text style={[shared.cardTitle, { marginBottom: 0 }]}>{p.user?.name}</Text>
                         {hasUnreviewed && (
                           <View style={[styles.urgentPill, { backgroundColor: accentColor }]}>
@@ -614,6 +624,9 @@ export default function DoctorScreen({ user, onLogout }) {
                           </View>
                         )}
                       </View>
+                      {p.patient_code && (
+                        <Text style={styles.patientCodeTag}>{p.patient_code}</Text>
+                      )}
                       <Text style={shared.muted}>{p.user?.email}</Text>
                       <View style={shared.metaRow}>
                         {p.gender ? <Text style={[shared.metaTag, { backgroundColor: colors.bg }]}>⚧ {p.gender}</Text> : null}
@@ -815,5 +828,8 @@ function makeStyles(colors) {
   emptyTabTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   reviewedChip: { backgroundColor: dark ? '#14532d' : '#dcfce7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   pendingChip: { backgroundColor: dark ? '#431407' : '#ffedd5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  patientCodeTag: { fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 1, marginTop: 1 },
+  detailCodeBadge: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  detailCodeText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   });
 }

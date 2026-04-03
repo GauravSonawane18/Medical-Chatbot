@@ -1,4 +1,7 @@
-﻿from fastapi import HTTPException, status
+﻿import random
+import re
+
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -6,6 +9,22 @@ from app.models.chat import Chat
 from app.models.doctor_note import DoctorNote
 from app.models.medical_history import MedicalHistory
 from app.models.patient import Patient
+
+
+def generate_patient_code(db: Session, name: str) -> str:
+    """Generate a unique MDBT-XXXX style patient code (e.g. MDBT-4832)."""
+    existing = {
+        row[0] for row in db.execute(
+            select(Patient.patient_code).where(Patient.patient_code.ilike("MDBT-%"))
+        ).fetchall()
+        if row[0]
+    }
+    for _ in range(200):
+        code = f"MDBT-{random.randint(1000, 9999)}"
+        if code not in existing:
+            return code
+    # All 9000 4-digit slots taken — extend to 5 digits
+    return f"MDBT-{random.randint(10000, 99999)}"
 
 
 def get_patient_by_user_id(db: Session, user_id: int) -> Patient | None:

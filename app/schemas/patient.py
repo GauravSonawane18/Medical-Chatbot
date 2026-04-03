@@ -36,6 +36,7 @@ class PatientSummaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    patient_code: str | None
     age: int | None
     gender: str | None
     phone_number: str | None

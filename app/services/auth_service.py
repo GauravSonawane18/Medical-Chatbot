@@ -6,6 +6,7 @@ from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, TokenResponse
 from app.schemas.user import UserResponse
+from app.services.patient_service import generate_patient_code
 from app.utils.security import create_access_token, get_password_hash, verify_password
 
 
@@ -24,8 +25,10 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
     db.flush()
 
     if payload.role.value == "patient":
+        patient_code = generate_patient_code(db, payload.name)
         patient = Patient(
             user_id=user.id,
+            patient_code=patient_code,
             age=payload.age,
             gender=payload.gender,
             phone_number=payload.phone_number,

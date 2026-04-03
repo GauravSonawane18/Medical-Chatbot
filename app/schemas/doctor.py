@@ -37,6 +37,7 @@ class FlaggedConversationResponse(BaseModel):
     id: int
     patient_id: int
     patient_name: str
+    patient_code: str | None = None
     message: str
     response: str
     severity_level: SeverityLevel
