@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(default=None, validation_alias="OPENAI_BASE_URL")
     cors_origins: list[str] = Field(default=["*"], validation_alias="CORS_ORIGINS")
 
+    # Email / SMTP
+    smtp_host: str = Field(default="smtp.gmail.com", validation_alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_user: str = Field(default="", validation_alias="SMTP_USER")
+    smtp_password: str = Field(default="", validation_alias="SMTP_PASSWORD")
+    email_from_name: str = Field(default="MedAssist", validation_alias="EMAIL_FROM_NAME")
+    app_base_url: str = Field(default="http://localhost:8000", validation_alias="APP_BASE_URL")
+
     @field_validator("debug", mode="before")
     @classmethod
     def normalize_debug(cls, value: object) -> bool:

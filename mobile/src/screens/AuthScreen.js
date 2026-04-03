@@ -210,11 +210,9 @@ export default function AuthScreen({ onLogin }) {
     setResetBusy(true);
     setAlert({ message: '' });
     try {
-      const data = await api.requestPasswordReset({ email: resetEmail });
-      // In prod, token is emailed. Here we pre-fill it for demo.
-      setResetToken(data.reset_token || '');
+      await api.requestPasswordReset({ email: resetEmail });
       setResetStep('confirm');
-      setAlert({ message: data.message, type: 'success' });
+      setAlert({ message: `A 6-digit code has been sent to ${resetEmail}. Check your inbox.`, type: 'success' });
     } catch (e) {
       setAlert({ message: e.message, type: 'error' });
     } finally {
@@ -320,28 +318,66 @@ export default function AuthScreen({ onLogin }) {
             </>
           ) : tab === 'login' && resetStep === 'request' ? (
             <>
-              <Text style={[styles.sectionLabel, { color: colors.primary }]}>Reset Password</Text>
-              <Text style={shared.label}>Your email address</Text>
-              <TextInput style={shared.input} value={resetEmail} onChangeText={setResetEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={colors.muted} />
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 40, marginBottom: 8 }}>🔐</Text>
+                <Text style={[styles.sectionLabel, { color: colors.text, textAlign: 'center' }]}>Forgot Password?</Text>
+                <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+                  Enter your registered email and we'll send a 6-digit reset code to your inbox.
+                </Text>
+              </View>
+              <Text style={[shared.label, { color: colors.label }]}>Email address</Text>
+              <TextInput
+                style={[shared.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                value={resetEmail}
+                onChangeText={setResetEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholder="you@example.com"
+                placeholderTextColor={colors.muted}
+              />
               <TouchableOpacity style={[shared.primaryBtn, resetBusy && { opacity: 0.6 }]} onPress={handleResetRequest} disabled={resetBusy}>
-                <Text style={shared.primaryBtnText}>{resetBusy ? 'Sending…' : 'Send Reset Token'}</Text>
+                <Text style={shared.primaryBtnText}>{resetBusy ? 'Sending code…' : '📧 Send Reset Code'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => { setResetStep(null); setAlert({ message: '' }); }}>
+              <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => { setResetStep(null); setAlert({ message: '' }); }}>
                 <Text style={{ color: colors.muted, fontSize: 13 }}>← Back to Sign In</Text>
               </TouchableOpacity>
             </>
           ) : tab === 'login' && resetStep === 'confirm' ? (
             <>
-              <Text style={[styles.sectionLabel, { color: colors.primary }]}>Set New Password</Text>
-              <Text style={shared.label}>Reset Token</Text>
-              <TextInput style={shared.input} value={resetToken} onChangeText={setResetToken} placeholder="Paste token here" placeholderTextColor={colors.muted} autoCapitalize="none" />
-              <Text style={shared.label}>New Password</Text>
-              <TextInput style={shared.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="Min. 8 characters" placeholderTextColor={colors.muted} />
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 40, marginBottom: 8 }}>📬</Text>
+                <Text style={[styles.sectionLabel, { color: colors.text, textAlign: 'center' }]}>Check Your Email</Text>
+                <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+                  We sent a 6-digit code to{'\n'}<Text style={{ color: colors.primary, fontWeight: '700' }}>{resetEmail}</Text>
+                </Text>
+              </View>
+              <Text style={[shared.label, { color: colors.label }]}>6-digit OTP code</Text>
+              <TextInput
+                style={[shared.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border, fontSize: 22, letterSpacing: 8, textAlign: 'center', fontWeight: '700' }]}
+                value={resetToken}
+                onChangeText={setResetToken}
+                placeholder="000000"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+              <Text style={[shared.label, { color: colors.label }]}>New Password</Text>
+              <TextInput
+                style={[shared.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                placeholder="Min. 8 characters"
+                placeholderTextColor={colors.muted}
+              />
               <TouchableOpacity style={[shared.primaryBtn, resetBusy && { opacity: 0.6 }]} onPress={handleResetConfirm} disabled={resetBusy}>
-                <Text style={shared.primaryBtnText}>{resetBusy ? 'Resetting…' : 'Reset Password'}</Text>
+                <Text style={shared.primaryBtnText}>{resetBusy ? 'Resetting…' : '🔒 Reset Password'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => { setResetStep('request'); setAlert({ message: '' }); }}>
-                <Text style={{ color: colors.muted, fontSize: 13 }}>← Back</Text>
+                <Text style={{ color: colors.muted, fontSize: 13 }}>Didn't get the code? Resend</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 8, alignItems: 'center' }} onPress={() => { setResetStep(null); setAlert({ message: '' }); }}>
+                <Text style={{ color: colors.muted, fontSize: 13 }}>← Back to Sign In</Text>
               </TouchableOpacity>
             </>
           ) : (
