@@ -60,5 +60,6 @@ app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 
 @app.get("/health", tags=["Health"])
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+def health_check() -> dict:
+    s = get_settings()
+    return {"status": "ok", "smtp_configured": bool(s.smtp_user and s.smtp_password)}
