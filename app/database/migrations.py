@@ -18,16 +18,13 @@ _MIGRATIONS = [
 ]
 
 
-def _generate_code(name: str, existing_codes: set[str]) -> str:
+def _generate_code(existing_codes: set[str]) -> str:
     import random
-    import re
-    initials = re.sub(r"[^A-Z]", "", (name or "PT").upper())[:3] or "PT"
-    for _ in range(100):
-        code = f"MDB-{initials}{random.randint(1000, 9999)}"
+    for _ in range(200):
+        code = f"MDBT-{random.randint(1000, 9999)}"
         if code not in existing_codes:
             return code
-    # Fallback: extend digits
-    return f"MDB-{initials}{random.randint(10000, 99999)}"
+    return f"MDBT-{random.randint(10000, 99999)}"
 
 
 def run_migrations(db: Session) -> None:
@@ -40,12 +37,7 @@ def run_migrations(db: Session) -> None:
     if rows:
         existing = {r[1] for r in db.execute(text("SELECT patient_code FROM patients WHERE patient_code IS NOT NULL")).fetchall()}
         for (pid,) in [(r[0],) for r in rows]:
-            name_row = db.execute(
-                text("SELECT u.name FROM patients p JOIN users u ON u.id = p.user_id WHERE p.id = :pid"),
-                {"pid": pid},
-            ).fetchone()
-            name = name_row[0] if name_row else "Patient"
-            code = _generate_code(name, existing)
+            code = _generate_code(existing)
             existing.add(code)
             db.execute(text("UPDATE patients SET patient_code = :code WHERE id = :pid"), {"code": code, "pid": pid})
         db.commit()

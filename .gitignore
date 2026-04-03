@@ -17,6 +17,9 @@ venv/
 *.err.log
 *.out.log
 
+# Uploads (user-generated files)
+app/uploads/
+
 # Mobile
 mobile/venv/
 mobile/node_modules/
