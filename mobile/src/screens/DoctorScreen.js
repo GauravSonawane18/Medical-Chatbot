@@ -64,11 +64,14 @@ function ReviewedTag({ isReviewed, reviewedAt }) {
   );
 }
 
+const STAT_ICONS = { Patients: '👥', Flagged: '🚩', Critical: '🔴', Unreviewed: '🕐' };
+
 function StatCard({ label, value, color }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.statCard, { borderTopColor: color, backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={{ fontSize: 18, marginBottom: 4 }}>{STAT_ICONS[label] || '📊'}</Text>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.muted }]}>{label}</Text>
     </View>
@@ -327,17 +330,44 @@ function PatientDetail({ patient, onBack, onSaved, doctorId }) {
                 <View style={styles.replyForm}>
                   <Text style={styles.replyFormTitle}>Doctor's Response to this Chat</Text>
 
-                  <Text style={shared.label}>Clinical Notes</Text>
-                  <TextInput style={[shared.textarea, { height: 80 }]} value={noteForm.notes} onChangeText={(v) => setNoteForm((f) => ({ ...f, notes: v }))} placeholder="Observations, concerns, follow-up actions…" multiline />
+                  <Text style={[shared.label, { color: colors.label }]}>Clinical Notes</Text>
+                  <TextInput
+                    style={[shared.textarea, { height: 80, color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                    value={noteForm.notes}
+                    onChangeText={(v) => setNoteForm((f) => ({ ...f, notes: v }))}
+                    placeholder="Observations, concerns, follow-up actions…"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                  />
 
-                  <Text style={shared.label}>Diagnosis</Text>
-                  <TextInput style={shared.input} value={noteForm.diagnosis} onChangeText={(v) => setNoteForm((f) => ({ ...f, diagnosis: v }))} placeholder="e.g. Viral fever, Stage 1 hypertension" />
+                  <Text style={[shared.label, { color: colors.label }]}>Diagnosis</Text>
+                  <TextInput
+                    style={[shared.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                    value={noteForm.diagnosis}
+                    onChangeText={(v) => setNoteForm((f) => ({ ...f, diagnosis: v }))}
+                    placeholder="e.g. Viral fever, Stage 1 hypertension"
+                    placeholderTextColor={colors.muted}
+                  />
 
-                  <Text style={shared.label}>Recommendation</Text>
-                  <TextInput style={[shared.textarea, { height: 70 }]} value={noteForm.recommendation} onChangeText={(v) => setNoteForm((f) => ({ ...f, recommendation: v }))} placeholder="Prescribed medications, lifestyle changes…" multiline />
+                  <Text style={[shared.label, { color: colors.label }]}>Recommendation</Text>
+                  <TextInput
+                    style={[shared.textarea, { height: 70, color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                    value={noteForm.recommendation}
+                    onChangeText={(v) => setNoteForm((f) => ({ ...f, recommendation: v }))}
+                    placeholder="Prescribed medications, lifestyle changes…"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                  />
 
-                  <Text style={[shared.label, styles.msgLabel]}>💬 Message to Patient</Text>
-                  <TextInput style={[shared.textarea, { height: 80, borderColor: colors.primary }]} value={noteForm.message_to_patient} onChangeText={(v) => setNoteForm((f) => ({ ...f, message_to_patient: v }))} placeholder="Write a direct message the patient will see in their chat…" multiline />
+                  <Text style={[shared.label, { color: colors.primary }]}>💬 Message to Patient</Text>
+                  <TextInput
+                    style={[shared.textarea, { height: 80, color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.primary }]}
+                    value={noteForm.message_to_patient}
+                    onChangeText={(v) => setNoteForm((f) => ({ ...f, message_to_patient: v }))}
+                    placeholder="Write a direct message the patient will see in their chat…"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                  />
 
                   <TouchableOpacity style={[shared.primaryBtn, busy && { opacity: 0.6 }]} onPress={saveNote} disabled={busy}>
                     <Text style={shared.primaryBtnText}>{busy ? 'Sending…' : 'Save & Send to Patient'}</Text>
@@ -465,9 +495,21 @@ export default function DoctorScreen({ user, onLogout }) {
           {/* ── Dashboard Tab ── */}
           {tab === 'dashboard' && (
             <>
-              <Text style={shared.sectionHeader}>Overview</Text>
+              {/* Welcome banner */}
+              <View style={[styles.welcomeBanner, { backgroundColor: colors.primary }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.welcomeTitle}>Good day, Dr. {user.name.split(' ')[0]} 👋</Text>
+                  <Text style={styles.welcomeSub}>
+                    {unreviewedCount > 0
+                      ? `${unreviewedCount} case${unreviewedCount > 1 ? 's' : ''} need your attention`
+                      : 'All cases are up to date'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 40 }}>🩺</Text>
+              </View>
 
               {/* Stats */}
+              <Text style={[styles.sectionHeading, { color: colors.text }]}>Overview</Text>
               <View style={styles.statsRow}>
                 <StatCard label="Patients" value={patients.length} color={colors.primary} />
                 <StatCard label="Flagged" value={flaggedChats.length} color="#c2410c" />
@@ -480,7 +522,9 @@ export default function DoctorScreen({ user, onLogout }) {
                 <>
                   <View style={styles.priorityHeader}>
                     <Text style={styles.priorityTitle}>⚠ Needs Immediate Attention</Text>
-                    <Text style={shared.muted}>{unreviewedCount} unreviewed</Text>
+                    <View style={styles.priorityBadge}>
+                      <Text style={styles.priorityBadgeText}>{unreviewedCount}</Text>
+                    </View>
                   </View>
                   {flaggedChats
                     .filter((c) => !c.is_reviewed)
@@ -493,17 +537,25 @@ export default function DoctorScreen({ user, onLogout }) {
                       return (
                         <TouchableOpacity
                           key={chat.id}
-                          style={[shared.card, { borderLeftWidth: 4, borderLeftColor: sc.text }]}
+                          style={[shared.card, { borderLeftWidth: 4, borderLeftColor: sc.text, backgroundColor: colors.card, borderColor: colors.border }]}
                           onPress={() => openPatient(chat.patient_id)}
+                          activeOpacity={0.75}
                         >
                           <View style={styles.chatCardHeader}>
                             <SeverityBadge level={chat.severity_level} />
-                            <Text style={shared.muted}>{formatDate(chat.created_at)}</Text>
+                            <Text style={[shared.muted, { fontSize: 11 }]}>{formatDate(chat.created_at)}</Text>
                           </View>
-                          <Text style={styles.patientName}>{chat.patient_name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <View style={[styles.patientAvatar, { backgroundColor: sc.text }]}>
+                              <Text style={styles.patientAvatarText}>{(chat.patient_name || '?')[0].toUpperCase()}</Text>
+                            </View>
+                            <Text style={styles.patientName}>{chat.patient_name}</Text>
+                          </View>
                           <Text style={styles.chatPreview} numberOfLines={2}>{chat.message}</Text>
                           {chat.risk_reason && (
-                            <Text style={[styles.riskText, { color: sc.text, marginTop: 4 }]}>⚑ {chat.risk_reason}</Text>
+                            <View style={[styles.riskPill, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+                              <Text style={[styles.riskText, { color: sc.text }]}>⚑ {chat.risk_reason}</Text>
+                            </View>
                           )}
                           <Text style={styles.tapHint}>Tap to open patient →</Text>
                         </TouchableOpacity>
@@ -514,8 +566,9 @@ export default function DoctorScreen({ user, onLogout }) {
 
               {unreviewedCount === 0 && (
                 <View style={styles.allClearBox}>
-                  <Text style={styles.allClearIcon}>✓</Text>
+                  <Text style={{ fontSize: 48, marginBottom: 8 }}>✅</Text>
                   <Text style={styles.allClearText}>All flagged cases reviewed</Text>
+                  <Text style={[shared.muted, { textAlign: 'center', marginTop: 4 }]}>Great work! No pending cases.</Text>
                 </View>
               )}
             </>
@@ -524,34 +577,51 @@ export default function DoctorScreen({ user, onLogout }) {
           {/* ── Patients Tab ── */}
           {tab === 'patients' && (
             <>
-              <Text style={shared.sectionHeader}>All Patients ({patients.length})</Text>
-              {patients.length === 0 && <Text style={shared.muted}>No patients registered yet.</Text>}
+              <View style={styles.tabHeader}>
+                <Text style={[styles.sectionHeading, { color: colors.text, marginBottom: 0 }]}>All Patients</Text>
+                <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.countPillText}>{patients.length}</Text>
+                </View>
+              </View>
+              {patients.length === 0 && (
+                <View style={styles.emptyTab}>
+                  <Text style={{ fontSize: 48, marginBottom: 12 }}>👤</Text>
+                  <Text style={[styles.emptyTabTitle, { color: colors.text }]}>No patients yet</Text>
+                  <Text style={[shared.muted, { textAlign: 'center' }]}>Patients will appear here once they register.</Text>
+                </View>
+              )}
               {patients.map((p) => {
                 const hasUnreviewed = flaggedChats.some((c) => c.patient_id === p.id && !c.is_reviewed);
                 const hasCritical = flaggedChats.some((c) => c.patient_id === p.id && c.severity_level === 'critical' && !c.is_reviewed);
+                const initials = (p.user?.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const accentColor = hasCritical ? colors.danger : hasUnreviewed ? '#c2410c' : colors.primary;
                 return (
                   <TouchableOpacity
                     key={p.id}
-                    style={[shared.card, hasUnreviewed && { borderLeftWidth: 4, borderLeftColor: hasCritical ? colors.danger : '#c2410c' }]}
+                    style={[styles.patientCard, { backgroundColor: colors.card, borderColor: hasUnreviewed ? accentColor : colors.border }]}
                     onPress={() => openPatient(p.id)}
+                    activeOpacity={0.75}
                   >
-                    <View style={styles.patientRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={shared.cardTitle}>{p.user?.name}</Text>
-                        <Text style={shared.muted}>{p.user?.email}</Text>
-                        <View style={shared.metaRow}>
-                          {p.gender ? <Text style={shared.metaTag}>{p.gender}</Text> : null}
-                          {p.age ? <Text style={shared.metaTag}>Age {p.age}</Text> : null}
-                          {p.blood_group ? <Text style={shared.metaTag}>{p.blood_group}</Text> : null}
-                        </View>
-                      </View>
-                      {hasUnreviewed && (
-                        <View style={[styles.urgentDot, { backgroundColor: hasCritical ? colors.danger : '#c2410c' }]}>
-                          <Text style={styles.urgentDotText}>!</Text>
-                        </View>
-                      )}
+                    <View style={[styles.patientInitialCircle, { backgroundColor: accentColor }]}>
+                      <Text style={styles.patientInitialText}>{initials}</Text>
                     </View>
-                    <Text style={styles.tapHint}>Tap to view full history →</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[shared.cardTitle, { marginBottom: 0 }]}>{p.user?.name}</Text>
+                        {hasUnreviewed && (
+                          <View style={[styles.urgentPill, { backgroundColor: accentColor }]}>
+                            <Text style={styles.urgentPillText}>{hasCritical ? '🔴 Critical' : '⚠ Urgent'}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={shared.muted}>{p.user?.email}</Text>
+                      <View style={shared.metaRow}>
+                        {p.gender ? <Text style={[shared.metaTag, { backgroundColor: colors.bg }]}>⚧ {p.gender}</Text> : null}
+                        {p.age ? <Text style={[shared.metaTag, { backgroundColor: colors.bg }]}>🎂 {p.age}y</Text> : null}
+                        {p.blood_group ? <Text style={[shared.metaTag, { backgroundColor: colors.bg }]}>🩸 {p.blood_group}</Text> : null}
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 20, color: colors.muted }}>›</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -561,8 +631,19 @@ export default function DoctorScreen({ user, onLogout }) {
           {/* ── Priority / Flagged Tab ── */}
           {tab === 'flagged' && (
             <>
-              <Text style={shared.sectionHeader}>All Flagged Chats</Text>
-              {flaggedChats.length === 0 && <Text style={shared.muted}>No flagged conversations.</Text>}
+              <View style={styles.tabHeader}>
+                <Text style={[styles.sectionHeading, { color: colors.text, marginBottom: 0 }]}>Flagged Chats</Text>
+                <View style={[styles.countPill, { backgroundColor: colors.danger }]}>
+                  <Text style={styles.countPillText}>{flaggedChats.length}</Text>
+                </View>
+              </View>
+              {flaggedChats.length === 0 && (
+                <View style={styles.emptyTab}>
+                  <Text style={{ fontSize: 48, marginBottom: 12 }}>🎉</Text>
+                  <Text style={[styles.emptyTabTitle, { color: colors.text }]}>No flagged chats</Text>
+                  <Text style={[shared.muted, { textAlign: 'center' }]}>All conversations are within normal range.</Text>
+                </View>
+              )}
               {[...flaggedChats]
                 .sort((a, b) => {
                   if (a.is_reviewed !== b.is_reviewed) return a.is_reviewed ? 1 : -1;
@@ -574,20 +655,29 @@ export default function DoctorScreen({ user, onLogout }) {
                   return (
                     <TouchableOpacity
                       key={chat.id}
-                      style={[shared.card, { borderLeftWidth: 4, borderLeftColor: sc.text }, chat.is_reviewed && { opacity: 0.65 }]}
+                      style={[shared.card, { borderLeftWidth: 4, borderLeftColor: sc.text, backgroundColor: colors.card, borderColor: colors.border, opacity: chat.is_reviewed ? 0.65 : 1 }]}
                       onPress={() => openPatient(chat.patient_id)}
+                      activeOpacity={0.75}
                     >
                       <View style={styles.chatCardHeader}>
                         <SeverityBadge level={chat.severity_level} />
                         {chat.is_reviewed
-                          ? <Text style={styles.reviewedMini}>✓ Reviewed</Text>
-                          : <Text style={styles.unreviewedMini}>Pending</Text>}
+                          ? <View style={styles.reviewedChip}><Text style={styles.reviewedMini}>✓ Reviewed</Text></View>
+                          : <View style={styles.pendingChip}><Text style={styles.unreviewedMini}>⏳ Pending</Text></View>}
                       </View>
-                      <Text style={styles.patientName}>{chat.patient_name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <View style={[styles.patientAvatar, { backgroundColor: sc.text }]}>
+                          <Text style={styles.patientAvatarText}>{(chat.patient_name || '?')[0].toUpperCase()}</Text>
+                        </View>
+                        <Text style={styles.patientName}>{chat.patient_name}</Text>
+                      </View>
                       <Text style={styles.chatPreview} numberOfLines={2}>{chat.message}</Text>
-                      {chat.risk_reason && <Text style={[styles.riskText, { color: sc.text }]}>⚑ {chat.risk_reason}</Text>}
-                      <Text style={shared.muted}>{formatDate(chat.created_at)}</Text>
-                      <Text style={styles.tapHint}>Tap to open →</Text>
+                      {chat.risk_reason && (
+                        <View style={[styles.riskPill, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+                          <Text style={[styles.riskText, { color: sc.text }]}>⚑ {chat.risk_reason}</Text>
+                        </View>
+                      )}
+                      <Text style={[shared.muted, { marginTop: 6, fontSize: 11 }]}>{formatDate(chat.created_at)}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -676,5 +766,54 @@ function makeStyles(colors) {
   patientReplyBox: { marginTop: 8, backgroundColor: dark ? '#0c2340' : '#f0f9ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: dark ? '#075985' : '#bae6fd' },
   patientReplyLabel: { fontSize: 10, fontWeight: '700', color: dark ? '#7dd3fc' : '#0369a1', textTransform: 'uppercase', marginBottom: 4 },
   patientReplyText: { fontSize: 13, color: colors.text, lineHeight: 18 },
+
+  // Enhanced dashboard
+  welcomeBanner: {
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  welcomeTitle: { fontSize: 18, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  welcomeSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
+  sectionHeading: { fontSize: 16, fontWeight: '800', marginBottom: 14, letterSpacing: 0.3 },
+  priorityBadge: { backgroundColor: colors.danger, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
+  priorityBadgeText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  riskPill: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5, marginTop: 6, alignSelf: 'flex-start' },
+  patientAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  patientAvatarText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+
+  // Patient card
+  tabHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  countPill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
+  countPillText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  patientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  patientInitialCircle: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  patientInitialText: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  urgentPill: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  urgentPillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  emptyTab: { alignItems: 'center', paddingVertical: 60 },
+  emptyTabTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  reviewedChip: { backgroundColor: dark ? '#14532d' : '#dcfce7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  pendingChip: { backgroundColor: dark ? '#431407' : '#ffedd5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   });
 }

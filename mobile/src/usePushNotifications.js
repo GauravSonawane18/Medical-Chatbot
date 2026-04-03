@@ -4,33 +4,34 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { api } from './api';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Push notifications are NOT supported in Expo Go since SDK 53.
+// They only work in a development build or production build.
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
 
-// Android requires a notification channel
-if (Platform.OS === 'android') {
-  Notifications.setNotificationChannelAsync('default', {
-    name: 'MedAssist',
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#2563eb',
+if (!IS_EXPO_GO) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
   });
+
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+      name: 'MedAssist',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#2563eb',
+    });
+  }
 }
 
-/**
- * Registers for Expo push notifications and sends the token to the backend.
- * isDoctor controls which endpoint to use.
- *
- * Requires EAS project to be linked:
- *   npx expo login && npx eas init
- */
 export function usePushNotifications(isDoctor = false) {
   useEffect(() => {
+    // Skip entirely in Expo Go — not supported since SDK 53
+    if (IS_EXPO_GO) return;
+
     let cancelled = false;
 
     async function register() {
@@ -43,30 +44,22 @@ export function usePushNotifications(isDoctor = false) {
         }
         if (finalStatus !== 'granted') return;
 
-        // projectId is set by `npx eas init` into app.json > extra.eas.projectId
         const projectId =
           Constants.expoConfig?.extra?.eas?.projectId ??
           Constants.easConfig?.projectId;
 
-        if (!projectId) {
-          // Push notifications require EAS setup:
-          // Run: npx expo login && npx eas init
-          return;
-        }
+        if (!projectId) return;
 
         const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-        if (cancelled) return;
-
-        const token = tokenData?.data;
-        if (!token) return;
+        if (cancelled || !tokenData?.data) return;
 
         if (isDoctor) {
-          await api.registerDoctorPushToken({ token });
+          await api.registerDoctorPushToken({ token: tokenData.data });
         } else {
-          await api.registerPushToken({ token });
+          await api.registerPushToken({ token: tokenData.data });
         }
       } catch {
-        // Fail silently — simulator or EAS not configured
+        // Fail silently
       }
     }
 

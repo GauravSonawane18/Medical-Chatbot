@@ -387,13 +387,13 @@ export default function PatientScreen({ user, onLogout }) {
       {/* Header */}
       <View style={[styles.topBar, { backgroundColor: colors.headerBg }]}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.topGreeting}>Hello,</Text>
+          <Text style={styles.topGreeting}>Welcome back 👋</Text>
           <Text style={styles.topName}>{user.name}</Text>
         </View>
         {unreadDoctorMessages > 0 && (
-          <View style={styles.notifBadge}>
-            <Text style={styles.notifText}>💬 {unreadDoctorMessages}</Text>
-          </View>
+          <TouchableOpacity style={styles.notifBadge} onPress={() => setTab('chat')}>
+            <Text style={styles.notifText}>💬 {unreadDoctorMessages} new</Text>
+          </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.themeBtn} onPress={toggleTheme}>
           <Text style={styles.themeBtnText}>{dark ? '☀️' : '🌙'}</Text>
@@ -421,7 +421,15 @@ export default function PatientScreen({ user, onLogout }) {
             <>
               {/* Symptom Checker / Input card */}
               <View style={[styles.inputCard, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={[styles.inputCardTitle, { color: colors.text }]}>Symptom Checker</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <View style={[styles.inputCardIcon, { backgroundColor: colors.primary }]}>
+                    <Text style={{ fontSize: 16 }}>🩺</Text>
+                  </View>
+                  <View>
+                    <Text style={[styles.inputCardTitle, { color: colors.text, marginBottom: 0 }]}>Symptom Checker</Text>
+                    <Text style={[styles.inputCardSub, { color: colors.muted }]}>AI-powered medical assessment</Text>
+                  </View>
+                </View>
 
                 <Text style={[shared.label, { color: colors.label }]}>What is your main symptom?</Text>
                 <TextInput
@@ -501,13 +509,16 @@ export default function PatientScreen({ user, onLogout }) {
                 ) : null}
 
                 <TouchableOpacity
-                  style={[styles.sendBtn, (!message.trim() || chatBusy || uploading) && styles.sendBtnDisabled]}
+                  style={[styles.sendBtn, { backgroundColor: message.trim() ? colors.primary : colors.muted }, (!message.trim() || chatBusy || uploading) && styles.sendBtnDisabled]}
                   onPress={handleChat}
                   disabled={!message.trim() || chatBusy || uploading}
                 >
                   {chatBusy || uploading
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.sendBtnText}>Get AI Assessment →</Text>}
+                    ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ActivityIndicator color="#fff" size="small" />
+                        <Text style={styles.sendBtnText}>{uploading ? 'Uploading…' : 'Analysing…'}</Text>
+                      </View>
+                    : <Text style={styles.sendBtnText}>🔍 Get AI Assessment</Text>}
                 </TouchableOpacity>
               </View>
 
@@ -713,16 +724,18 @@ function makeStyles(colors) {
 
   // Input card — bg set dynamically via inline style
   inputCard: {
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  inputCardTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 14 },
+  inputCardIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  inputCardTitle: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 14 },
+  inputCardSub: { fontSize: 12, marginTop: 1 },
   optionalTag: { fontSize: 12, color: colors.muted, fontWeight: '400' },
   sendBtn: {
     backgroundColor: colors.primary,
